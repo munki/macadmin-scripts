@@ -218,7 +218,15 @@ def parse_dist(filename):
     auxinfo = auxinfos[0]
     key = None
     value = None
-    for node in auxinfo.childNodes:
+    children = auxinfo.childNodes
+    # handle the possibility that keys from auxinfo may be nested
+    # within a 'dict' element
+    dict_nodes = [n for n in auxinfo.childNodes
+                  if n.nodeType == n.ELEMENT_NODE and
+                  n.tagName == 'dict']
+    if dict_nodes:
+        children = dict_nodes[0].childNodes
+    for node in children:
         if node.nodeType == node.ELEMENT_NODE and node.tagName == 'key':
             key = node.firstChild.wholeText
         if node.nodeType == node.ELEMENT_NODE and node.tagName == 'string':
