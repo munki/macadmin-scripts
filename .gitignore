@@ -1,0 +1,7 @@
+# disk images
+*.dmg
+*.sparseimage
+
+# our content directory
+content/
+
