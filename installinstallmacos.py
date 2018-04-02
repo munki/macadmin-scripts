@@ -119,12 +119,15 @@ def unmountdmg(mountpoint):
 
 
 def install_product(dist_path, target_vol):
-    '''Install a product to a target volume'''
+    '''Install a product to a target volume.
+    Returns a boolean to indicate success or failure.'''
     cmd = ['/usr/sbin/installer', '-pkg', dist_path, '-target', target_vol]
     try:
         subprocess.check_call(cmd)
+        return True
     except subprocess.CalledProcessError, err:
         print >> sys.stderr, err
+        return False
 
 
 class ReplicationError(Exception):
@@ -396,9 +399,13 @@ def main():
     mountpoint = mountdmg(sparse_diskimage_path)
     if mountpoint:
         # install the product to the mounted sparseimage volume
-        install_product(
+        success = install_product(
             product_info[product_id]['DistributionPath'],
             mountpoint)
+        if not success:
+            print >> sys.stderr, 'Product installation failed.'
+            unmountdmg(mountpoint)
+            exit(-1)
         print 'Product downloaded and installed to %s' % sparse_diskimage_path
         if not args.compress:
             unmountdmg(mountpoint)
