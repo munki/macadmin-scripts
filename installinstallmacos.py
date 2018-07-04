@@ -329,6 +329,7 @@ def replicate_product(catalog, product_id, workdir, ignore_cache=False):
 
 def main():
     '''Do the main thing here'''
+
     if os.getuid() != 0:
         sys.exit('This command requires root (to install packages), so please '
                  'run again with sudo or as root.')
@@ -347,6 +348,12 @@ def main():
                         'the Install macOS app at the root.')
     parser.add_argument('--ignore-cache', action='store_true',
                         help='Ignore any previously cached files.')
+    parser.add_argument('--build', metavar='build_version',
+                        default='',
+                        help='Specify a specific build to search for and '
+                        'download.')
+    parser.add_argument('--displayonly', action='store_true',
+                        help='Output the available updates and quit.')
     args = parser.parse_args()
 
     # download sucatalog and look for products that are for macOS installers
@@ -360,6 +367,8 @@ def main():
             'No macOS installer products found in the sucatalog.')
         exit(-1)
 
+
+
     # display a menu of choices (some seed catalogs have multiple installers)
     print '%2s %12s %10s %8s  %s' % ('#', 'ProductID', 'Version',
                                      'Build', 'Title')
@@ -370,16 +379,28 @@ def main():
                                          product_info[product_id]['BUILD'],
                                          product_info[product_id]['title'])
 
-    answer = raw_input(
-        '\nChoose a product to download (1-%s): ' % len(product_info))
-    try:
-        index = int(answer) - 1
-        if index < 0:
-            raise ValueError
-        product_id = product_info.keys()[index]
-    except (ValueError, IndexError):
-        print 'Exiting.'
+    # Quit now if displaynonly argument supplied
+    if args.displayonly:
         exit(0)
+
+    # check for specified build if argument supplied
+    if args.build:
+        for index, product_id in enumerate(product_info):
+            if args.build == product_info[product_id]['BUILD']:
+                answer = index+1
+                print '# %s chosen.' % answer
+
+    if not answer:
+        answer = raw_input(
+            '\nChoose a product to download (1-%s): ' % len(product_info))
+        try:
+            index = int(answer) - 1
+            if index < 0:
+                raise ValueError
+            product_id = product_info.keys()[index]
+        except (ValueError, IndexError):
+            print 'Exiting.'
+            exit(0)
 
     # download all the packages for the selected product
     replicate_product(
