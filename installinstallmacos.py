@@ -390,7 +390,9 @@ def main():
                 answer = index+1
                 print '# %s chosen.' % answer
 
-    if not answer:
+    try:
+        answer
+    except NameError:
         answer = raw_input(
             '\nChoose a product to download (1-%s): ' % len(product_info))
         try:
