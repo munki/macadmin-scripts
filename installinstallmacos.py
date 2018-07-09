@@ -326,7 +326,6 @@ def replicate_product(catalog, product_id, workdir, ignore_cache=False):
                     % (package['MetadataURL'], err))
                 exit(-1)
 
-
 def main():
     '''Do the main thing here'''
 
@@ -352,8 +351,9 @@ def main():
                         default='',
                         help='Specify a specific build to search for and '
                         'download.')
-    parser.add_argument('--displayonly', action='store_true',
-                        help='Output the available updates and quit.')
+    parser.add_argument('--list', action='store_true',
+                        help='Output the available updates to a plist '
+                        'and quit.')
     args = parser.parse_args()
 
     # download sucatalog and look for products that are for macOS installers
@@ -367,7 +367,9 @@ def main():
             'No macOS installer products found in the sucatalog.')
         exit(-1)
 
-
+    output_plist = "%s/softwareupdate.plist" % args.workdir
+    pl = {}
+    pl['result'] = []
 
     # display a menu of choices (some seed catalogs have multiple installers)
     print '%2s %12s %10s %8s  %s' % ('#', 'ProductID', 'Version',
@@ -379,30 +381,47 @@ def main():
                                          product_info[product_id]['BUILD'],
                                          product_info[product_id]['title'])
 
-    # Quit now if displaynonly argument supplied
-    if args.displayonly:
+        pl_index =  {'index': index+1,
+                'product_id': product_id,
+                'version': product_info[product_id]['version'],
+                'build': product_info[product_id]['BUILD'],
+                'title': product_info[product_id]['title'],
+                }
+
+        pl['result'].append(pl_index)
+
+        if args.build:
+            if args.build == product_info[product_id]['BUILD']:
+                answer = index+1
+
+
+    # Output a plist of available updates and quit if --list option chosen
+    if args.list:
+        plistlib.writePlist(pl, output_plist)
         exit(0)
 
     # check for specified build if argument supplied
     if args.build:
-        for index, product_id in enumerate(product_info):
-            if args.build == product_info[product_id]['BUILD']:
-                answer = index+1
-                print '# %s chosen.' % answer
+        try:
+            answer
+        except NameError:
+            print ('No valid build chosen. Run again without --build argument'
+                   'to select a valid build to download.')
+            exit(0)
+        else:
+            print '# %s chosen.' % answer
+    else:
+        answer = raw_input(
+                '\nChoose a product to download (1-%s): ' % len(product_info))
 
     try:
-        answer
-    except NameError:
-        answer = raw_input(
-            '\nChoose a product to download (1-%s): ' % len(product_info))
-        try:
-            index = int(answer) - 1
-            if index < 0:
-                raise ValueError
-            product_id = product_info.keys()[index]
-        except (ValueError, IndexError):
-            print 'Exiting.'
-            exit(0)
+        index = int(answer) - 1
+        if index < 0:
+            raise ValueError
+        product_id = product_info.keys()[index]
+    except (ValueError, IndexError):
+        print 'Exiting.'
+        exit(0)
 
     # download all the packages for the selected product
     replicate_product(
