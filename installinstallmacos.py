@@ -25,6 +25,7 @@ empty disk image'''
 
 
 import argparse
+import gzip
 import os
 import plistlib
 import subprocess
@@ -37,7 +38,20 @@ from xml.parsers.expat import ExpatError
 DEFAULT_SUCATALOG = (
     'https://swscan.apple.com/content/catalogs/others/'
     'index-10.13seed-10.13-10.12-10.11-10.10-10.9'
-    '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog')
+    '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz')
+
+
+def get_seed_catalog():
+    '''Returns the developer seed sucatalog'''
+    seed_catalogs_plist = (
+        '/System/Library/PrivateFrameworks/Seeding.framework/Versions/Current/'
+        'Resources/SeedCatalogs.plist'
+    )
+    try:
+        seed_catalogs = plistlib.readPlist(seed_catalogs_plist)
+        return seed_catalogs.get('DeveloperSeed', DEFAULT_SUCATALOG)
+    except (OSError, ExpatError, AttributeError, KeyError):
+        return DEFAULT_SUCATALOG
 
 
 def make_sparse_image(volume_name, output_path):
@@ -249,13 +263,24 @@ def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
     except ReplicationError, err:
         print >> sys.stderr, 'Could not replicate %s: %s' % (sucatalog, err)
         exit(-1)
-    try:
-        catalog = plistlib.readPlist(localcatalogpath)
-        return catalog
-    except (OSError, IOError, ExpatError), err:
-        print >> sys.stderr, (
-            'Error reading %s: %s' % (localcatalogpath, err))
-        exit(-1)
+    if os.path.splitext(localcatalogpath)[1] == '.gz':
+        with gzip.open(localcatalogpath) as f:
+            content = f.read()
+            try:
+                catalog = plistlib.readPlistFromString(content)
+                return catalog
+            except ExpatError, err:
+                print >> sys.stderr, (
+                    'Error reading %s: %s' % (localcatalogpath, err))
+                exit(-1)
+    else:
+        try:
+            catalog = plistlib.readPlist(localcatalogpath)
+            return catalog
+        except (OSError, IOError, ExpatError), err:
+            print >> sys.stderr, (
+                'Error reading %s: %s' % (localcatalogpath, err))
+            exit(-1)
 
 
 def find_mac_os_installers(catalog):
@@ -335,7 +360,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--catalogurl', metavar='sucatalog_url',
-                        default=DEFAULT_SUCATALOG,
+                        default=get_seed_catalog(),
                         help='Software Update catalog URL.')
     parser.add_argument('--workdir', metavar='path_to_working_dir',
                         default='.',
