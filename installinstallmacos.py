@@ -31,6 +31,7 @@ import plistlib
 import subprocess
 import sys
 import urlparse
+import xattr
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
 
@@ -40,15 +41,27 @@ DEFAULT_SUCATALOG = (
     'index-10.13seed-10.13-10.12-10.11-10.10-10.9'
     '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz')
 
+SEED_CATALOGS_PLIST = (
+    '/System/Library/PrivateFrameworks/Seeding.framework/Versions/Current/'
+    'Resources/SeedCatalogs.plist'
+)
+
+
+def get_seeding_program(sucatalog_url):
+    '''Returns a seeding program name based on the sucatalog_url'''
+    try:
+        seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
+        for key, value in seed_catalogs.items():
+            if sucatalog_url == value:
+                return key
+    except (OSError, ExpatError, AttributeError, KeyError):
+        return None
+
 
 def get_seed_catalog():
     '''Returns the developer seed sucatalog'''
-    seed_catalogs_plist = (
-        '/System/Library/PrivateFrameworks/Seeding.framework/Versions/Current/'
-        'Resources/SeedCatalogs.plist'
-    )
     try:
-        seed_catalogs = plistlib.readPlist(seed_catalogs_plist)
+        seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
         return seed_catalogs.get('DeveloperSeed', DEFAULT_SUCATALOG)
     except (OSError, ExpatError, AttributeError, KeyError):
         return DEFAULT_SUCATALOG
@@ -352,6 +365,15 @@ def replicate_product(catalog, product_id, workdir, ignore_cache=False):
                 exit(-1)
 
 
+def find_installer_app(mountpoint):
+    '''Returns the path to the Install macOS app on the mountpoint'''
+    applications_dir = os.path.join(mountpoint, 'Applications')
+    for item in os.listdir(applications_dir):
+        if item.endswith('.app'):
+            return os.path.join(applications_dir, item)
+    return None
+
+
 def main():
     '''Do the main thing here'''
     if os.getuid() != 0:
@@ -369,7 +391,13 @@ def main():
                         'directory.')
     parser.add_argument('--compress', action='store_true',
                         help='Output a read-only compressed disk image with '
-                        'the Install macOS app at the root.')
+                        'the Install macOS app at the root. This is now the '
+                        'default. Use --raw to get a read-write sparse image '
+                        'with the app in the Applications directory.')
+    parser.add_argument('--raw', action='store_true',
+                        help='Output a read-write sparse image '
+                        'with the app in the Applications directory. Requires '
+                        'less available disk space and is faster.')
     parser.add_argument('--ignore-cache', action='store_true',
                         help='Ignore any previously cached files.')
     args = parser.parse_args()
@@ -431,22 +459,25 @@ def main():
             print >> sys.stderr, 'Product installation failed.'
             unmountdmg(mountpoint)
             exit(-1)
+        # add the seeding program xattr to the app if applicable
+        seeding_program = get_seeding_program(args.catalogurl)
+        if seeding_program:
+            installer_app = find_installer_app(mountpoint)
+            if installer_app:
+                xattr.setxattr(installer_app, 'SeedProgram', seeding_program)
         print 'Product downloaded and installed to %s' % sparse_diskimage_path
-        if not args.compress:
+        if args.raw:
             unmountdmg(mountpoint)
         else:
-            # if --compress option given, create a r/o compressed diskimage
+            # if --raw option not given, create a r/o compressed diskimage
             # containing the Install macOS app
             compressed_diskimagepath = os.path.join(
                 args.workdir, volname + '.dmg')
             if os.path.exists(compressed_diskimagepath):
                 os.unlink(compressed_diskimagepath)
-            applications_dir = os.path.join(mountpoint, 'Applications')
-            for item in os.listdir(applications_dir):
-                if item.endswith('.app'):
-                    app_path = os.path.join(applications_dir, item)
-                    make_compressed_dmg(app_path, compressed_diskimagepath)
-                    break
+            app_path = find_installer_app(mountpoint)
+            if app_path:
+                make_compressed_dmg(app_path, compressed_diskimagepath)
             # unmount sparseimage
             unmountdmg(mountpoint)
             # delete sparseimage since we don't need it any longer
