@@ -1,6 +1,13 @@
+# .DS_Store
+.DS_Store
+
 # disk images
 *.dmg
 *.sparseimage
+
+# .pyc and .pyo files
+*.pyc
+*.pyo
 
 # our content directory
 content/
