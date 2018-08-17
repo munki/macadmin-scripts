@@ -3,6 +3,19 @@
 Some scripts that might be of use to macOS admins. Might be related to Munki;
 might not.
 
+#### createbootvolfromautonbi.py
+
+A tool to make bootable disk volumes from the output of autonbi. Especially
+useful to make bootable disks containing Imagr and the 'SIP-ignoring' kernel,
+which allows Imagr to run scripts that affect SIP state, set UAKEL options, and
+run the `startosinstall` component, all of which might otherwise require network
+booting from a NetInstall-style nbi.
+
+This provides a way to create a bootable external disk that acts like the Netboot environment used by/needed by Imagr.
+
+This command converts the output of Imagr's `make nbi` into a bootable external USB disk:
+`sudo ./createbootvolfromautonbi.py --nbi ~/Desktop/10.13.6_Imagr.nbi --volume /Volumes/ExternalDisk`
+
 #### installinstallmacos.py
 
 This script can create disk images containing macOS Installer applications available via Apple's softwareupdate catalogs.
@@ -28,15 +41,9 @@ Use a compatible Mac or select a diffrent build compatible with your current har
 
 Run `./installinstallmacos.py --help` to see the available options.
 
-#### createbootvolfromautonbi.py
+#### make_firmwareupdater_pkg.sh
 
-A tool to make bootable disk volumes from the output of autonbi. Especially
-useful to make bootable disks containing Imagr and the 'SIP-ignoring' kernel,
-which allows Imagr to run scripts that affect SIP state, set UAKEL options, and
-run the `startosinstall` component, all of which might otherwise require network
-booting from a NetInstall-style nbi.
+This script was used to extract the firmware updaters from early High Sierra installers and make a standalone installer package that could be used to upgrade Mac firmware before installing High Sierra via imaging.
 
-This provides a way to create a bootable external disk that acts like the Netboot environment used by/needed by Imagr.
+Later High Sierra installer changes have broken this script; since installing High Sierra via imaging is not recommended or supported by Apple and several other alternatives are now available, I don't plan on attempting to fix or upgrade this tool.
 
-This command converts the output of Imagr's `make nbi` into a bootable external USB disk:
-`sudo ./createbootvolfromautonbi.py --nbi ~/Desktop/10.13.6_Imagr.nbi --volume /Volumes/ExternalDisk`
