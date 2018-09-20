@@ -30,6 +30,7 @@ import os
 import plistlib
 import subprocess
 import sys
+import time
 import urlparse
 import xattr
 from xml.dom import minidom
@@ -323,7 +324,7 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
         filename = get_server_metadata(catalog, product_key, workdir)
         product_info[product_key] = parse_server_metadata(filename)
         product = catalog['Products'][product_key]
-        product_info[product_key]['PostDate'] = str(product['PostDate'])
+        product_info[product_key]['PostDate'] = product['PostDate']
         distributions = product['Distributions']
         dist_url = distributions.get('English') or distributions.get('en')
         try:
@@ -414,14 +415,17 @@ def main():
         exit(-1)
 
     # display a menu of choices (some seed catalogs have multiple installers)
-    print '%2s %12s %10s %8s  %s' % ('#', 'ProductID', 'Version',
-                                     'Build', 'Title')
+    print '%2s %12s %10s %8s %11s  %s' % ('#', 'ProductID', 'Version',
+                                     'Build', 'Post Date', 'Title')
     for index, product_id in enumerate(product_info):
-        print '%2s %12s %10s %8s  %s' % (index+1,
-                                         product_id,
-                                         product_info[product_id]['version'],
-                                         product_info[product_id]['BUILD'],
-                                         product_info[product_id]['title'])
+        print '%2s %12s %10s %8s %11s  %s' % (
+            index + 1,
+            product_id,
+            product_info[product_id]['version'],
+            product_info[product_id]['BUILD'],
+            product_info[product_id]['PostDate'].strftime('%Y-%m-%d'),
+            product_info[product_id]['title']
+        )
 
     answer = raw_input(
         '\nChoose a product to download (1-%s): ' % len(product_info))
