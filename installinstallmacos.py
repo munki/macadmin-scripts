@@ -25,11 +25,15 @@ empty disk image'''
 
 
 import argparse
+import gzip
 import os
 import plistlib
 import subprocess
+import re
 import sys
+import time
 import urlparse
+import xattr
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
 
@@ -37,7 +41,57 @@ from xml.parsers.expat import ExpatError
 DEFAULT_SUCATALOG = (
     'https://swscan.apple.com/content/catalogs/others/'
     'index-10.13seed-10.13-10.12-10.11-10.10-10.9'
-    '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog')
+    '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz')
+
+SEED_CATALOGS_PLIST = (
+    '/System/Library/PrivateFrameworks/Seeding.framework/Versions/Current/'
+    'Resources/SeedCatalogs.plist'
+)
+
+
+def get_board_id():
+    '''Gets the local system board ID'''
+    ioreg_cmd = ['ioreg', '-p', 'IODeviceTree', '-r', '-n', '/', '-d', '1']
+    try:
+        ioreg_output = subprocess.check_output(ioreg_cmd).splitlines()
+        for line in ioreg_output:
+            if 'board-id' in line:
+                board_id = line.split(" ")[-1]
+                board_id = board_id[board_id.find('<"')+2:board_id.find('">')]
+                return board_id
+    except subprocess.CalledProcessError, err:
+        raise ReplicationError(err)
+
+
+def get_hw_model():
+    '''Gets the local system ModelIdentifier'''
+    sysctl_cmd = ['/usr/sbin/sysctl', 'hw.model']
+    try:
+        sysctl_output = subprocess.check_output(sysctl_cmd)
+        hw_model = sysctl_output.split(" ")[-1].split("\n")[0]
+    except subprocess.CalledProcessError, err:
+        raise ReplicationError(err)
+    return hw_model
+
+
+def get_seeding_program(sucatalog_url):
+    '''Returns a seeding program name based on the sucatalog_url'''
+    try:
+        seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
+        for key, value in seed_catalogs.items():
+            if sucatalog_url == value:
+                return key
+    except (OSError, ExpatError, AttributeError, KeyError):
+        return None
+
+
+def get_seed_catalog():
+    '''Returns the developer seed sucatalog'''
+    try:
+        seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
+        return seed_catalogs.get('DeveloperSeed', DEFAULT_SUCATALOG)
+    except (OSError, ExpatError, AttributeError, KeyError):
+        return DEFAULT_SUCATALOG
 
 
 def make_sparse_image(volume_name, output_path):
@@ -153,7 +207,7 @@ def replicate_url(full_url, root_dir='/tmp',
     if not ignore_cache and os.path.exists(local_file_path):
         curl_cmd.extend(['-z', local_file_path])
     curl_cmd.append(full_url)
-    print "Downloading %s..." % full_url
+    # print "Downloading %s..." % full_url
     try:
         subprocess.check_call(curl_cmd)
     except subprocess.CalledProcessError, err:
@@ -241,6 +295,30 @@ def parse_dist(filename):
     return dist_info
 
 
+def get_board_ids(filename):
+    '''Parses a softwareupdate dist file, returning a list of supported
+    Board IDs'''
+    supported_board_ids = ""
+    with open(filename) as search:
+        for line in search:
+            line = line.rstrip()  # remove '\n' at end of line
+            if 'boardIds' in line:
+                supported_board_ids = line.split(" ")[-1][:-1]
+                return supported_board_ids
+
+
+def get_unsupported_models(filename):
+    '''Parses a softwareupdate dist file, returning a list of non-supported
+    ModelIdentifiers'''
+    unsupported_models = ""
+    with open(filename) as search:
+        for line in search:
+            line = line.rstrip()  # remove '\n' at end of line
+            if 'nonSupportedModels' in line:
+                unsupported_models = line.split(" ")[-1][:-1]
+                return unsupported_models
+
+
 def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
     '''Downloads and returns a parsed softwareupdate catalog'''
     try:
@@ -249,13 +327,24 @@ def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
     except ReplicationError, err:
         print >> sys.stderr, 'Could not replicate %s: %s' % (sucatalog, err)
         exit(-1)
-    try:
-        catalog = plistlib.readPlist(localcatalogpath)
-        return catalog
-    except (OSError, IOError, ExpatError), err:
-        print >> sys.stderr, (
-            'Error reading %s: %s' % (localcatalogpath, err))
-        exit(-1)
+    if os.path.splitext(localcatalogpath)[1] == '.gz':
+        with gzip.open(localcatalogpath) as f:
+            content = f.read()
+            try:
+                catalog = plistlib.readPlistFromString(content)
+                return catalog
+            except ExpatError, err:
+                print >> sys.stderr, (
+                    'Error reading %s: %s' % (localcatalogpath, err))
+                exit(-1)
+    else:
+        try:
+            catalog = plistlib.readPlist(localcatalogpath)
+            return catalog
+        except (OSError, IOError, ExpatError), err:
+            print >> sys.stderr, (
+                'Error reading %s: %s' % (localcatalogpath, err))
+            exit(-1)
 
 
 def find_mac_os_installers(catalog):
@@ -285,7 +374,7 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
         filename = get_server_metadata(catalog, product_key, workdir)
         product_info[product_key] = parse_server_metadata(filename)
         product = catalog['Products'][product_key]
-        product_info[product_key]['PostDate'] = str(product['PostDate'])
+        product_info[product_key]['PostDate'] = product['PostDate']
         distributions = product['Distributions']
         dist_url = distributions.get('English') or distributions.get('en')
         try:
@@ -295,6 +384,10 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
             print >> sys.stderr, 'Could not replicate %s: %s' % (dist_url, err)
         dist_info = parse_dist(dist_path)
         product_info[product_key]['DistributionPath'] = dist_path
+        unsupported_models = get_unsupported_models(dist_path)
+        product_info[product_key]['UnsupportedModels'] = unsupported_models
+        board_ids = get_board_ids(dist_path)
+        product_info[product_key]['BoardIDs'] = board_ids
         product_info[product_key].update(dist_info)
 
     return product_info
@@ -326,8 +419,22 @@ def replicate_product(catalog, product_id, workdir, ignore_cache=False):
                     % (package['MetadataURL'], err))
                 exit(-1)
 
+
+def find_installer_app(mountpoint):
+    '''Returns the path to the Install macOS app on the mountpoint'''
+    applications_dir = os.path.join(mountpoint, 'Applications')
+    for item in os.listdir(applications_dir):
+        if item.endswith('.app'):
+            return os.path.join(applications_dir, item)
+    return None
+
+
 def main():
     '''Do the main thing here'''
+
+    print
+    print "installinstallmacos.py - get macOS installers from Apple's software catalog"
+    print
 
     if os.getuid() != 0:
         sys.exit('This command requires root (to install packages), so please '
@@ -335,7 +442,7 @@ def main():
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--catalogurl', metavar='sucatalog_url',
-                        default=DEFAULT_SUCATALOG,
+                        default=get_seed_catalog(),
                         help='Software Update catalog URL.')
     parser.add_argument('--workdir', metavar='path_to_working_dir',
                         default='.',
@@ -344,7 +451,13 @@ def main():
                         'directory.')
     parser.add_argument('--compress', action='store_true',
                         help='Output a read-only compressed disk image with '
-                        'the Install macOS app at the root.')
+                        'the Install macOS app at the root. This is now the '
+                        'default. Use --raw to get a read-write sparse image '
+                        'with the app in the Applications directory.')
+    parser.add_argument('--raw', action='store_true',
+                        help='Output a read-write sparse image '
+                        'with the app in the Applications directory. Requires '
+                        'less available disk space and is faster.')
     parser.add_argument('--ignore-cache', action='store_true',
                         help='Ignore any previously cached files.')
     parser.add_argument('--build', metavar='build_version',
@@ -354,7 +467,18 @@ def main():
     parser.add_argument('--list', action='store_true',
                         help='Output the available updates to a plist '
                         'and quit.')
+    parser.add_argument('--validate', action='store_true',
+                        help='Validate builds for board ID and hardware model '
+                        'and only show appropriate builds.')
     args = parser.parse_args()
+
+    # show this Mac's hardware model
+    hw_model = get_hw_model()
+    print "This Mac's ModelIdentifier: %s" % hw_model
+    # show this Mac's board-id
+    board_id = get_board_id()
+    print "This Mac's Board ID:        %s" % board_id
+    print
 
     # download sucatalog and look for products that are for macOS installers
     catalog = download_and_parse_sucatalog(
@@ -372,14 +496,22 @@ def main():
     pl['result'] = []
 
     # display a menu of choices (some seed catalogs have multiple installers)
-    print '%2s %12s %10s %8s  %s' % ('#', 'ProductID', 'Version',
-                                     'Build', 'Title')
+    print '%2s %12s %10s %8s %11s  %s' % ('#', 'ProductID', 'Version',
+                                     'Build', 'Post Date', 'Title')
     for index, product_id in enumerate(product_info):
-        print '%2s %12s %10s %8s  %s' % (index+1,
-                                         product_id,
-                                         product_info[product_id]['version'],
-                                         product_info[product_id]['BUILD'],
-                                         product_info[product_id]['title'])
+        if args.validate:
+            if board_id not in product_info[product_id]['BoardIDs']:
+                continue
+            if hw_model in product_info[product_id]['UnsupportedModels']:
+                continue
+        print '%2s %12s %10s %8s %11s  %s' % (
+            index + 1,
+            product_id,
+            product_info[product_id]['version'],
+            product_info[product_id]['BUILD'],
+            product_info[product_id]['PostDate'].strftime('%Y-%m-%d'),
+            product_info[product_id]['title']
+        )
 
         pl_index =  {'index': index+1,
                 'product_id': product_id,
@@ -448,22 +580,25 @@ def main():
             print >> sys.stderr, 'Product installation failed.'
             unmountdmg(mountpoint)
             exit(-1)
+        # add the seeding program xattr to the app if applicable
+        seeding_program = get_seeding_program(args.catalogurl)
+        if seeding_program:
+            installer_app = find_installer_app(mountpoint)
+            if installer_app:
+                xattr.setxattr(installer_app, 'SeedProgram', seeding_program)
         print 'Product downloaded and installed to %s' % sparse_diskimage_path
-        if not args.compress:
+        if args.raw:
             unmountdmg(mountpoint)
         else:
-            # if --compress option given, create a r/o compressed diskimage
+            # if --raw option not given, create a r/o compressed diskimage
             # containing the Install macOS app
             compressed_diskimagepath = os.path.join(
                 args.workdir, volname + '.dmg')
             if os.path.exists(compressed_diskimagepath):
                 os.unlink(compressed_diskimagepath)
-            applications_dir = os.path.join(mountpoint, 'Applications')
-            for item in os.listdir(applications_dir):
-                if item.endswith('.app'):
-                    app_path = os.path.join(applications_dir, item)
-                    make_compressed_dmg(app_path, compressed_diskimagepath)
-                    break
+            app_path = find_installer_app(mountpoint)
+            if app_path:
+                make_compressed_dmg(app_path, compressed_diskimagepath)
             # unmount sparseimage
             unmountdmg(mountpoint)
             # delete sparseimage since we don't need it any longer
