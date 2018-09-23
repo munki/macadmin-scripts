@@ -76,28 +76,20 @@ def get_hw_model():
     return hw_model
 
 
-def get_current_build():
+def get_current_build_info():
     '''Gets the local system build'''
+    build_info = []
     sw_vers_cmd = ['/usr/bin/sw_vers']
     try:
         sw_vers_output = subprocess.check_output(sw_vers_cmd).splitlines()
         for line in sw_vers_output:
+            if 'ProductVersion' in line:
+                build_info.insert(0, line.split("\t")[-1])
             if 'BuildVersion' in line:
-                os_build = line.split("\t")[-1]
-                return os_build
+                build_info.insert(1, line.split("\t")[-1])
     except subprocess.CalledProcessError, err:
         raise ReplicationError(err)
-    return os_build
-
-
-    '''Returns a seeding program name based on the sucatalog_url'''
-    try:
-        seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
-        for key, value in seed_catalogs.items():
-            if sucatalog_url == value:
-                return key
-    except (OSError, ExpatError, AttributeError, KeyError):
-        return None
+    return build_info
 
 
 def get_seeding_program(sucatalog_url):
@@ -517,14 +509,15 @@ def main():
                         'the selected version.')
     args = parser.parse_args()
 
-    # show this Mac's hardware model
+    # show this Mac's info
     hw_model = get_hw_model()
-    print "This Mac's ModelIdentifier:   %s" % hw_model
-    # show this Mac's board-id
     board_id = get_board_id()
-    print "This Mac's Board ID:          %s" % board_id
-    os_build = get_current_build()
-    print "This Mac's Current Build ID:  %s\n" % os_build
+    build_info = get_current_build_info()
+    print "This Mac:"
+    print "%-17s: %s" % ('Model Identifier', hw_model)
+    print "%-17s: %s" % ('Board ID', board_id)
+    print "%-17s: %s" % ('OS Version', build_info[0])
+    print "%-17s: %s\n" % ('Build ID', build_info[1])
 
     # download sucatalog and look for products that are for macOS installers
     catalog = download_and_parse_sucatalog(
@@ -546,10 +539,13 @@ def main():
                                      'Build', 'Post Date', 'Title', 'Notes')
     for index, product_id in enumerate(product_info):
         not_valid = ''
-        if board_id not in product_info[product_id]['BoardIDs']:
-            not_valid = 'Not valid on this device'
         if hw_model in product_info[product_id]['UnsupportedModels']:
-            not_valid = 'Not valid on this device'
+            not_valid = 'Unsupported Model Identifier'
+        elif board_id not in product_info[product_id]['BoardIDs']:
+            not_valid = 'Unsupported Board ID'
+        elif get_lowest_version(build_info[0],product_info[product_id]['version']) != build_info[0]:
+            not_valid = 'Unsupported macOS version'
+
         print '%2s  %-15s %-10s %-8s %-11s %-20s %s' % (
             index + 1,
             product_id,
