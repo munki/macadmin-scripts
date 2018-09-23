@@ -500,6 +500,10 @@ def main():
     parser.add_argument('--auto', action='store_true',
                         help='Automatically select the appropriate valid build '
                         'for the current device.')
+    parser.add_argument('--version', metavar='match_version',
+                        default='',
+                        help='Selects the lowest valid build ID matching'
+                        'the selected version.')
     args = parser.parse_args()
 
     # show this Mac's hardware model
@@ -544,10 +548,21 @@ def main():
             product_info[product_id]['title'],
             not_valid
         )
-        if not_valid and (args.validate or args.auto):
+
+        # go through various options for automatically determining the answer
+
+        # skip if build is not suitable for current device
+        # and a validation parameter was chosen
+        if not_valid and (args.validate or args.auto or args.version):
             continue
 
-        if args.auto and 'Beta' not in product_info[product_id]['BUILD']:
+        # skip if a version is selected and it does not match
+        if args.version and args.version != product_info[product_id]['version']:
+            continue
+
+        # determine the lowest valid build ID and select this
+        # when using auto and version options
+        if (args.auto or args.version) and 'Beta' not in product_info[product_id]['title']:
             try:
                 lowest_valid_build
             except NameError:
@@ -560,7 +575,7 @@ def main():
                 if lowest_valid_build == product_info[product_id]['BUILD']:
                     answer = index+1
 
-
+        # Write this build info to plist
         pl_index =  {'index': index+1,
                 'product_id': product_id,
                 'version': product_info[product_id]['version'],
@@ -570,21 +585,23 @@ def main():
         pl['result'].append(pl_index)
 
         if args.build:
+            # automatically select matching build ID if build option used
             if args.build == product_info[product_id]['BUILD']:
                 answer = index+1
                 break
+
         elif args.current:
+            # automatically select matching build ID if current option used
             if os_build == product_info[product_id]['BUILD']:
                 answer = index+1
                 break
 
-
-    # Output a plist of available updates and quit if --list option chosen
+    # Output a plist of available updates and quit if list option chosen
     if args.list:
         plistlib.writePlist(pl, output_plist)
         exit(0)
 
-    # check for specified build if argument supplied
+    # check for validity of specified build if argument supplied
     if args.build:
         try:
             answer
@@ -595,7 +612,7 @@ def main():
                    'to select a valid build to download.\n' % args.build)
             exit(0)
         else:
-            print '\nBuild %s available. Downloading...\n' % args.build
+            print '\nBuild %s available. Downloading #%s...\n' % (args.build, answer)
     elif args.current:
         try:
             answer
@@ -606,8 +623,8 @@ def main():
                    'to select a valid build to download.\n' % os_build)
             exit(0)
         else:
-            print '\nBuild %s available. Downloading...\n' % os_build
-    elif args.auto:
+            print '\nBuild %s available. Downloading #%s...\n' % (os_build, answer)
+    elif args.auto or args.version:
         try:
             answer
         except NameError:
@@ -617,8 +634,9 @@ def main():
                    'to select a valid build to download.\n' % answer)
             exit(0)
         else:
-            print '\nBuild %s selected. Downloading...\n' % lowest_valid_build
+            print '\nBuild %s selected. Downloading #%s...\n' % (lowest_valid_build, answer)
     else:
+        # default option to interactively offer selection
         answer = raw_input(
                 '\nChoose a product to download (1-%s): ' % len(product_info))
 
