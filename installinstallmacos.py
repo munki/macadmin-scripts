@@ -129,13 +129,13 @@ def make_sparse_image(volume_name, output_path):
         exit(-1)
 
 
-def make_compressed_dmg(app_path, diskimagepath):
+def make_compressed_dmg(app_path, diskimagepath, volume_name):
     """Returns path to newly-created compressed r/o disk image containing
     Install macOS.app"""
 
     print ('Making read-only compressed disk image containing %s...'
            % os.path.basename(app_path))
-    cmd = ['/usr/bin/hdiutil', 'create', '-fs', 'HFS+',
+    cmd = ['/usr/bin/hdiutil', 'create', '-volname "%s"' % volume_name, '-fs', 'HFS+',
            '-srcfolder', app_path, diskimagepath]
     try:
         subprocess.check_call(cmd)
@@ -408,6 +408,14 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
     return product_info
 
 
+def get_lowest_version(current_item, lowest_item):
+    '''Compares versions between two values and returns the lowest value'''
+    if LooseVersion(current_item) < LooseVersion(lowest_item):
+        return current_item
+    else:
+        return lowest_item
+
+
 def replicate_product(catalog, product_id, workdir, ignore_cache=False):
     '''Downloads all the packages for a product'''
     product = catalog['Products'][product_id]
@@ -442,14 +450,6 @@ def find_installer_app(mountpoint):
         if item.endswith('.app'):
             return os.path.join(applications_dir, item)
     return None
-
-
-def get_lowest_version(current_item, lowest_item):
-    '''Compares versions between two values and returns the lowest value'''
-    if LooseVersion(current_item) < LooseVersion(lowest_item):
-        return current_item
-    else:
-        return lowest_item
 
 
 def main():
@@ -549,7 +549,7 @@ def main():
             not_valid
         )
 
-        # go through various options for automatically determining the answer
+        # go through various options for automatically determining the answer:
 
         # skip if build is not suitable for current device
         # and a validation parameter was chosen
@@ -692,7 +692,7 @@ def main():
                 os.unlink(compressed_diskimagepath)
             app_path = find_installer_app(mountpoint)
             if app_path:
-                make_compressed_dmg(app_path, compressed_diskimagepath)
+                make_compressed_dmg(app_path, compressed_diskimagepath, volname)
             # unmount sparseimage
             unmountdmg(mountpoint)
             # delete sparseimage since we don't need it any longer
