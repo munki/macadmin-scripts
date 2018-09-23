@@ -36,6 +36,8 @@ import urlparse
 import xattr
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
+from operator import itemgetter
+from distutils.version import LooseVersion
 
 
 DEFAULT_SUCATALOG = (
@@ -74,7 +76,20 @@ def get_hw_model():
     return hw_model
 
 
-def get_seeding_program(sucatalog_url):
+def get_current_build():
+    '''Gets the local system build'''
+    sw_vers_cmd = ['/usr/bin/sw_vers']
+    try:
+        sw_vers_output = subprocess.check_output(sw_vers_cmd).splitlines()
+        for line in sw_vers_output:
+            if 'BuildVersion' in line:
+                os_build = line.split("\t")[-1]
+                return os_build
+    except subprocess.CalledProcessError, err:
+        raise ReplicationError(err)
+    return os_build
+
+
     '''Returns a seeding program name based on the sucatalog_url'''
     try:
         seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
@@ -429,12 +444,21 @@ def find_installer_app(mountpoint):
     return None
 
 
+def get_lowest_version(current_item, lowest_item):
+    '''Compares versions between two values and returns the lowest value'''
+    if LooseVersion(current_item) < LooseVersion(lowest_item):
+        return current_item
+    else:
+        return lowest_item
+
+
 def main():
     '''Do the main thing here'''
 
-    print
-    print "installinstallmacos.py - get macOS installers from Apple's software catalog"
-    print
+    print ('\n'
+           'installinstallmacos.py - get macOS installers '
+           'from the Apple software catalog'
+           '\n')
 
     if os.getuid() != 0:
         sys.exit('This command requires root (to install packages), so please '
@@ -467,18 +491,25 @@ def main():
     parser.add_argument('--list', action='store_true',
                         help='Output the available updates to a plist '
                         'and quit.')
+    parser.add_argument('--current', action='store_true',
+                        help='Automatically select the current installed '
+                        'build.')
     parser.add_argument('--validate', action='store_true',
                         help='Validate builds for board ID and hardware model '
                         'and only show appropriate builds.')
+    parser.add_argument('--auto', action='store_true',
+                        help='Automatically select the appropriate valid build '
+                        'for the current device.')
     args = parser.parse_args()
 
     # show this Mac's hardware model
     hw_model = get_hw_model()
-    print "This Mac's ModelIdentifier: %s" % hw_model
+    print "This Mac's ModelIdentifier:   %s" % hw_model
     # show this Mac's board-id
     board_id = get_board_id()
-    print "This Mac's Board ID:        %s" % board_id
-    print
+    print "This Mac's Board ID:          %s" % board_id
+    os_build = get_current_build()
+    print "This Mac's Current Build ID:  %s\n" % os_build
 
     # download sucatalog and look for products that are for macOS installers
     catalog = download_and_parse_sucatalog(
@@ -496,22 +527,39 @@ def main():
     pl['result'] = []
 
     # display a menu of choices (some seed catalogs have multiple installers)
-    print '%2s %12s %10s %8s %11s  %s' % ('#', 'ProductID', 'Version',
-                                     'Build', 'Post Date', 'Title')
+    print '%2s  %-15s %-10s %-8s %-11s %-20s %s' % ('#', 'ProductID', 'Version',
+                                     'Build', 'Post Date', 'Title', 'Notes')
     for index, product_id in enumerate(product_info):
-        if args.validate:
-            if board_id not in product_info[product_id]['BoardIDs']:
-                continue
-            if hw_model in product_info[product_id]['UnsupportedModels']:
-                continue
-        print '%2s %12s %10s %8s %11s  %s' % (
+        not_valid = ''
+        if board_id not in product_info[product_id]['BoardIDs']:
+            not_valid = 'Not valid on this device'
+        if hw_model in product_info[product_id]['UnsupportedModels']:
+            not_valid = 'Not valid on this device'
+        print '%2s  %-15s %-10s %-8s %-11s %-20s %s' % (
             index + 1,
             product_id,
             product_info[product_id]['version'],
             product_info[product_id]['BUILD'],
             product_info[product_id]['PostDate'].strftime('%Y-%m-%d'),
-            product_info[product_id]['title']
+            product_info[product_id]['title'],
+            not_valid
         )
+        if not_valid and (args.validate or args.auto):
+            continue
+
+        if args.auto and 'Beta' not in product_info[product_id]['BUILD']:
+            try:
+                lowest_valid_build
+            except NameError:
+                lowest_valid_build = product_info[product_id]['BUILD']
+                answer = index+1
+            else:
+                lowest_valid_build = get_lowest_version(
+                                        product_info[product_id]['BUILD'],
+                                        lowest_valid_build)
+                if lowest_valid_build == product_info[product_id]['BUILD']:
+                    answer = index+1
+
 
         pl_index =  {'index': index+1,
                 'product_id': product_id,
@@ -519,12 +567,16 @@ def main():
                 'build': product_info[product_id]['BUILD'],
                 'title': product_info[product_id]['title'],
                 }
-
         pl['result'].append(pl_index)
 
         if args.build:
             if args.build == product_info[product_id]['BUILD']:
                 answer = index+1
+                break
+        elif args.current:
+            if os_build == product_info[product_id]['BUILD']:
+                answer = index+1
+                break
 
 
     # Output a plist of available updates and quit if --list option chosen
@@ -537,11 +589,35 @@ def main():
         try:
             answer
         except NameError:
-            print ('No valid build chosen. Run again without --build argument'
-                   'to select a valid build to download.')
+            print ('\n'
+                   'Build %s is not available. '
+                   'Run again without --build argument '
+                   'to select a valid build to download.\n' % args.build)
             exit(0)
         else:
-            print '# %s chosen.' % answer
+            print '\nBuild %s available. Downloading...\n' % args.build
+    elif args.current:
+        try:
+            answer
+        except NameError:
+            print ('\n'
+                   'Build %s is not available. '
+                   'Run again without --current argument '
+                   'to select a valid build to download.\n' % os_build)
+            exit(0)
+        else:
+            print '\nBuild %s available. Downloading...\n' % os_build
+    elif args.auto:
+        try:
+            answer
+        except NameError:
+            print ('\n'
+                   'Item # %s is not available. '
+                   'Run again without --auto argument '
+                   'to select a valid build to download.\n' % answer)
+            exit(0)
+        else:
+            print '\nBuild %s selected. Downloading...\n' % lowest_valid_build
     else:
         answer = raw_input(
                 '\nChoose a product to download (1-%s): ' % len(product_info))
