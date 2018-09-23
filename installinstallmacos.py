@@ -100,6 +100,17 @@ def get_current_build():
         return None
 
 
+def get_seeding_program(sucatalog_url):
+    '''Returns a seeding program name based on the sucatalog_url'''
+    try:
+        seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
+        for key, value in seed_catalogs.items():
+            if sucatalog_url == value:
+                return key
+    except (OSError, ExpatError, AttributeError, KeyError):
+        return None
+
+
 def get_seed_catalog():
     '''Returns the developer seed sucatalog'''
     try:
@@ -135,7 +146,7 @@ def make_compressed_dmg(app_path, diskimagepath, volume_name):
 
     print ('Making read-only compressed disk image containing %s...'
            % os.path.basename(app_path))
-    cmd = ['/usr/bin/hdiutil', 'create', '-volname "%s"' % volume_name, '-fs', 'HFS+',
+    cmd = ['/usr/bin/hdiutil', 'create', '-volname', volume_name, '-fs', 'HFS+',
            '-srcfolder', app_path, diskimagepath]
     try:
         subprocess.check_call(cmd)
