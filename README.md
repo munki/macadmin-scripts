@@ -37,7 +37,7 @@ Command '['/usr/sbin/installer', '-pkg', './content/downloads/07/20/091-95774/aw
 Product installation failed.
 ```
 
-Use a compatible Mac or select a diffrent build compatible with your current hardware and try again.
+Use a compatible Mac or select a diffrent build compatible with your current hardware and try again. You may also have success running the script in a VM; the InstallationCheck script in versions of the macOS installer to date skips the checks (and returns success) when run on a VM.
 
 Run `./installinstallmacos.py --help` to see the available options.
 
