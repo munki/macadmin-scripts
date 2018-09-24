@@ -535,7 +535,7 @@ def main():
     pl['result'] = []
 
     # display a menu of choices (some seed catalogs have multiple installers)
-    print '%2s  %-15s %-10s %-8s %-11s %-20s %s' % ('#', 'ProductID', 'Version',
+    print '%2s  %-15s %-10s %-8s %-11s %-30s %s' % ('#', 'ProductID', 'Version',
                                      'Build', 'Post Date', 'Title', 'Notes')
     for index, product_id in enumerate(product_info):
         not_valid = ''
@@ -546,7 +546,7 @@ def main():
         elif get_lowest_version(build_info[0],product_info[product_id]['version']) != build_info[0]:
             not_valid = 'Unsupported macOS version'
 
-        print '%2s  %-15s %-10s %-8s %-11s %-20s %s' % (
+        print '%2s  %-15s %-10s %-8s %-11s %-30s %s' % (
             index + 1,
             product_id,
             product_info[product_id]['version'],
