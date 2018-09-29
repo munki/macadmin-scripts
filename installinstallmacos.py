@@ -42,7 +42,7 @@ from distutils.version import LooseVersion
 
 DEFAULT_SUCATALOG = (
     'https://swscan.apple.com/content/catalogs/others/'
-    'index-10.13seed-10.13-10.12-10.11-10.10-10.9'
+    'index-10.14seed-10.14-10.13-10.12-10.11-10.10-10.9'
     '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz')
 
 SEED_CATALOGS_PLIST = (
