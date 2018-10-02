@@ -30,17 +30,21 @@ import os
 import plistlib
 import subprocess
 import sys
-import time
 import urlparse
 import xattr
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
 
 
-DEFAULT_SUCATALOG = (
-    'https://swscan.apple.com/content/catalogs/others/'
-    'index-10.13seed-10.13-10.12-10.11-10.10-10.9'
-    '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz')
+DEFAULT_SUCATALOGS = {
+    '17': 'https://swscan.apple.com/content/catalogs/others/'
+          'index-10.13-10.12-10.11-10.10-10.9'
+          '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog',
+    '18': 'https://swscan.apple.com/content/catalogs/others/'
+          'index-10.14-10.13-10.12-10.11-10.10-10.9'
+          '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog',
+}
+
 
 SEED_CATALOGS_PLIST = (
     '/System/Library/PrivateFrameworks/Seeding.framework/Versions/Current/'
@@ -55,17 +59,24 @@ def get_seeding_program(sucatalog_url):
         for key, value in seed_catalogs.items():
             if sucatalog_url == value:
                 return key
+        return ''
     except (OSError, ExpatError, AttributeError, KeyError):
-        return None
+        return ''
 
 
-def get_seed_catalog():
+def get_seed_catalog(seedname='DeveloperSeed'):
     '''Returns the developer seed sucatalog'''
     try:
         seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
-        return seed_catalogs.get('DeveloperSeed', DEFAULT_SUCATALOG)
+        return seed_catalogs.get(seedname)
     except (OSError, ExpatError, AttributeError, KeyError):
-        return DEFAULT_SUCATALOG
+        return ''
+
+
+def get_default_catalog():
+    '''Returns the default softwareupdate catalog for the current OS'''
+    darwin_major = os.uname()[2].split('.')[0]
+    return DEFAULT_SUCATALOGS.get(darwin_major)
 
 
 def make_sparse_image(volume_name, output_path):
@@ -163,8 +174,11 @@ class ReplicationError(Exception):
     pass
 
 
-def replicate_url(full_url, root_dir='/tmp',
-                  show_progress=False, ignore_cache=False):
+def replicate_url(full_url,
+                  root_dir='/tmp',
+                  show_progress=False,
+                  ignore_cache=False,
+                  attempt_resume=False):
     '''Downloads a URL and stores it in the same relative path on our
     filesystem. Returns a path to the replicated file.'''
 
@@ -180,6 +194,8 @@ def replicate_url(full_url, root_dir='/tmp',
                 '-o', local_file_path]
     if not ignore_cache and os.path.exists(local_file_path):
         curl_cmd.extend(['-z', local_file_path])
+        if attempt_resume:
+            curl_cmd.extend(['-C', '-'])
     curl_cmd.append(full_url)
     print "Downloading %s..." % full_url
     try:
@@ -278,8 +294,8 @@ def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
         print >> sys.stderr, 'Could not replicate %s: %s' % (sucatalog, err)
         exit(-1)
     if os.path.splitext(localcatalogpath)[1] == '.gz':
-        with gzip.open(localcatalogpath) as f:
-            content = f.read()
+        with gzip.open(localcatalogpath) as the_file:
+            content = the_file.read()
             try:
                 catalog = plistlib.readPlistFromString(content)
                 return catalog
@@ -350,7 +366,8 @@ def replicate_product(catalog, product_id, workdir, ignore_cache=False):
             try:
                 replicate_url(
                     package['URL'], root_dir=workdir,
-                    show_progress=True, ignore_cache=ignore_cache)
+                    show_progress=True, ignore_cache=ignore_cache,
+                    attempt_resume=(not ignore_cache))
             except ReplicationError, err:
                 print >> sys.stderr, (
                     'Could not replicate %s: %s' % (package['URL'], err))
@@ -382,9 +399,12 @@ def main():
                  'run again with sudo or as root.')
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--catalogurl', metavar='sucatalog_url',
-                        default=get_seed_catalog(),
-                        help='Software Update catalog URL.')
+    parser.add_argument('--seedprogram', default='',
+                        help='Which Seed Program catalog to use. Valid values '
+                        'are CustomerSeed, DeveloperSeed, and PublicSeed.')
+    parser.add_argument('--catalogurl', default='',
+                        help='Software Update catalog URL. This option '
+                        'overrides any seedprogram option.')
     parser.add_argument('--workdir', metavar='path_to_working_dir',
                         default='.',
                         help='Path to working directory on a volume with over '
@@ -403,9 +423,25 @@ def main():
                         help='Ignore any previously cached files.')
     args = parser.parse_args()
 
+    if args.catalogurl:
+        su_catalog_url = args.sucatalog_url
+    elif args.seedprogram:
+        su_catalog_url = get_seed_catalog(args.seedprogram)
+        if not su_catalog_url:
+            print >> sys.stderr, (
+                'Could not find a catalog url for seed program %s'
+                % args.seedprogram)
+            exit(-1)
+    else:
+        su_catalog_url = get_default_catalog()
+        if not su_catalog_url:
+            print >> sys.stderr, (
+                'Could not find a default catalog url for this OS version.')
+            exit(-1)
+
     # download sucatalog and look for products that are for macOS installers
     catalog = download_and_parse_sucatalog(
-        args.catalogurl, args.workdir, ignore_cache=args.ignore_cache)
+        su_catalog_url, args.workdir, ignore_cache=args.ignore_cache)
     product_info = os_installer_product_info(
         catalog, args.workdir, ignore_cache=args.ignore_cache)
 
@@ -416,7 +452,7 @@ def main():
 
     # display a menu of choices (some seed catalogs have multiple installers)
     print '%2s %12s %10s %8s %11s  %s' % ('#', 'ProductID', 'Version',
-                                     'Build', 'Post Date', 'Title')
+                                          'Build', 'Post Date', 'Title')
     for index, product_id in enumerate(product_info):
         print '%2s %12s %10s %8s %11s  %s' % (
             index + 1,
