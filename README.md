@@ -20,7 +20,11 @@ This command converts the output of Imagr's `make nbi` into a bootable external 
 
 This script can create disk images containing macOS Installer applications available via Apple's softwareupdate catalogs.
 
-It does this by downloading the packages from Apple's softwareupdate servers and then installing them into a new empty disk image.
+Run `./installinstallmacos.py --help` to see the available options.
+
+The tool assembles "Install macOS" applications by downloading the packages from Apple's softwareupdate servers and then installing them into a new empty disk image.
+
+If `/usr/bin/installer` returns errors during this process, it can be useful to examine `/var/log/install.log` for clues.
 
 Since it is using Apple's installer, any install check or volume check scripts are run. This means that you can only use this tool to create a diskimage containing the versions of macOS that will run on the exact machine you are running the script on.
 
@@ -37,9 +41,7 @@ Command '['/usr/sbin/installer', '-pkg', './content/downloads/07/20/091-95774/aw
 Product installation failed.
 ```
 
-Use a compatible Mac or select a diffrent build compatible with your current hardware and try again.
-
-Run `./installinstallmacos.py --help` to see the available options.
+Use a compatible Mac or select a different build compatible with your current hardware and try again. You may also have success running the script in a VM; the InstallationCheck script in versions of the macOS installer to date skips the checks (and returns success) when run on a VM.
 
 #### make_firmwareupdater_pkg.sh
 
