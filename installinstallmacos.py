@@ -424,7 +424,7 @@ def main():
     args = parser.parse_args()
 
     if args.catalogurl:
-        su_catalog_url = args.sucatalog_url
+        su_catalog_url = args.catalogurl
     elif args.seedprogram:
         su_catalog_url = get_seed_catalog(args.seedprogram)
         if not su_catalog_url:
