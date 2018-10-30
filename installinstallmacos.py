@@ -55,7 +55,7 @@ SEED_CATALOGS_PLIST = (
 
 def get_board_id():
     '''Gets the local system board ID'''
-    ioreg_cmd = ['ioreg', '-p', 'IODeviceTree', '-r', '-n', '/', '-d', '1']
+    ioreg_cmd = ['/usr/sbin/ioreg', '-p', 'IODeviceTree', '-r', '-n', '/', '-d', '1']
     try:
         ioreg_output = subprocess.check_output(ioreg_cmd).splitlines()
         for line in ioreg_output:
@@ -64,7 +64,8 @@ def get_board_id():
                 board_id = board_id[board_id.find('<"')+2:board_id.find('">')]
                 return board_id
     except subprocess.CalledProcessError, err:
-        raise ReplicationError(err)
+        print "Board ID could not be identified. Error was: %s" % err
+        return ''
 
 
 def is_a_vm():
@@ -78,7 +79,7 @@ def is_a_vm():
             if cpu_features[i] == "VMM":
                 is_vm = True
     except subprocess.CalledProcessError, err:
-        raise ReplicationError(err)
+        print "Could not determine VM state. Error was: %s" % err
     return is_vm
 
 
@@ -89,7 +90,8 @@ def get_hw_model():
         sysctl_output = subprocess.check_output(sysctl_cmd)
         hw_model = sysctl_output.split(" ")[-1].split("\n")[0]
     except subprocess.CalledProcessError, err:
-        raise ReplicationError(err)
+        print "Hardware model could not be identified. Error was: %s" % err
+        return ''
     return hw_model
 
 
@@ -104,9 +106,10 @@ def get_current_build_info():
                 build_info.insert(0, line.split("\t")[-1])
             if 'BuildVersion' in line:
                 build_info.insert(1, line.split("\t")[-1])
+        return build_info
     except subprocess.CalledProcessError, err:
-        raise ReplicationError(err)
-    return build_info
+        print "Current build could not be identified. Error was: %s" % err
+        return ''
 
 
 def get_seeding_program(sucatalog_url):
@@ -349,7 +352,7 @@ def get_board_ids(filename):
     with open(filename) as search:
         for line in search:
             line = line.rstrip()  # remove '\n' at end of line
-            if 'boardIds' in line:
+            if 'var boardIds =' in line:
                 supported_board_ids = line.split(" ")[-1][:-1]
                 return supported_board_ids
 
