@@ -69,6 +69,21 @@ def get_board_id():
         raise ReplicationError(err)
 
 
+def is_a_vm():
+    '''Determines if the script is being run in a virtual machine'''
+    sysctl_cmd = ['/usr/sbin/sysctl', 'machdep.cpu.features']
+    try:
+        sysctl_output = subprocess.check_output(sysctl_cmd)
+        cpu_features = sysctl_output.split(" ")
+        is_vm = False
+        for i in range(len(cpu_features)):
+            if cpu_features[i] == "VMM":
+                is_vm = True
+    except subprocess.CalledProcessError, err:
+        raise ReplicationError(err)
+    return is_vm
+
+
 def get_hw_model():
     '''Gets the local system ModelIdentifier'''
     sysctl_cmd = ['/usr/sbin/sysctl', 'hw.model']
@@ -352,7 +367,6 @@ def get_unsupported_models(filename):
                 unsupported_models = line.split(" ")[-1][:-1]
                 return unsupported_models
 
-
 def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
     '''Downloads and returns a parsed softwareupdate catalog'''
     try:
@@ -533,7 +547,11 @@ def main():
     hw_model = get_hw_model()
     board_id = get_board_id()
     build_info = get_current_build_info()
+    is_vm = is_a_vm()
+
     print "This Mac:"
+    if is_vm == True:
+        print "Identified as a Virtual Machine"
     print "%-17s: %s" % ('Model Identifier', hw_model)
     print "%-17s: %s" % ('Board ID', board_id)
     print "%-17s: %s" % ('OS Version', build_info[0])
@@ -570,17 +588,21 @@ def main():
     pl = {}
     pl['result'] = []
 
+    valid_build_found = False
+
     # display a menu of choices (some seed catalogs have multiple installers)
     print '%2s  %-15s %-10s %-8s %-11s %-30s %s' % ('#', 'ProductID', 'Version',
                                      'Build', 'Post Date', 'Title', 'Notes')
     for index, product_id in enumerate(product_info):
         not_valid = ''
-        if hw_model in product_info[product_id]['UnsupportedModels']:
+        if hw_model in product_info[product_id]['UnsupportedModels'] and is_vm == False:
             not_valid = 'Unsupported Model Identifier'
-        elif board_id not in product_info[product_id]['BoardIDs']:
+        elif board_id not in product_info[product_id]['BoardIDs'] and is_vm == False:
             not_valid = 'Unsupported Board ID'
         elif get_lowest_version(build_info[0],product_info[product_id]['version']) != build_info[0]:
             not_valid = 'Unsupported macOS version'
+        else:
+            valid_build_found = True
 
         print '%2s  %-15s %-10s %-8s %-11s %-30s %s' % (
             index + 1,
@@ -638,6 +660,11 @@ def main():
             if os_build == product_info[product_id]['BUILD']:
                 answer = index+1
                 break
+
+    # Stop here if no valid builds found
+    if valid_build_found == False:
+        print 'No valid build found for this hardware'
+        exit(0)
 
     # Output a plist of available updates and quit if list option chosen
     if args.list:
