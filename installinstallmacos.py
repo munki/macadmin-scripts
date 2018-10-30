@@ -30,22 +30,83 @@ import os
 import plistlib
 import subprocess
 import sys
-import time
 import urlparse
 import xattr
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
+from distutils.version import LooseVersion
 
 
-DEFAULT_SUCATALOG = (
-    'https://swscan.apple.com/content/catalogs/others/'
-    'index-10.13seed-10.13-10.12-10.11-10.10-10.9'
-    '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog.gz')
+DEFAULT_SUCATALOGS = {
+    '17': 'https://swscan.apple.com/content/catalogs/others/'
+          'index-10.13-10.12-10.11-10.10-10.9'
+          '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog',
+    '18': 'https://swscan.apple.com/content/catalogs/others/'
+          'index-10.14-10.13-10.12-10.11-10.10-10.9'
+          '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog',
+}
+
 
 SEED_CATALOGS_PLIST = (
     '/System/Library/PrivateFrameworks/Seeding.framework/Versions/Current/'
     'Resources/SeedCatalogs.plist'
 )
+
+
+def get_board_id():
+    '''Gets the local system board ID'''
+    ioreg_cmd = ['ioreg', '-p', 'IODeviceTree', '-r', '-n', '/', '-d', '1']
+    try:
+        ioreg_output = subprocess.check_output(ioreg_cmd).splitlines()
+        for line in ioreg_output:
+            if 'board-id' in line:
+                board_id = line.split(" ")[-1]
+                board_id = board_id[board_id.find('<"')+2:board_id.find('">')]
+                return board_id
+    except subprocess.CalledProcessError, err:
+        raise ReplicationError(err)
+
+
+def is_a_vm():
+    '''Determines if the script is being run in a virtual machine'''
+    sysctl_cmd = ['/usr/sbin/sysctl', 'machdep.cpu.features']
+    try:
+        sysctl_output = subprocess.check_output(sysctl_cmd)
+        cpu_features = sysctl_output.split(" ")
+        is_vm = False
+        for i in range(len(cpu_features)):
+            if cpu_features[i] == "VMM":
+                is_vm = True
+    except subprocess.CalledProcessError, err:
+        raise ReplicationError(err)
+    return is_vm
+
+
+def get_hw_model():
+    '''Gets the local system ModelIdentifier'''
+    sysctl_cmd = ['/usr/sbin/sysctl', 'hw.model']
+    try:
+        sysctl_output = subprocess.check_output(sysctl_cmd)
+        hw_model = sysctl_output.split(" ")[-1].split("\n")[0]
+    except subprocess.CalledProcessError, err:
+        raise ReplicationError(err)
+    return hw_model
+
+
+def get_current_build_info():
+    '''Gets the local system build'''
+    build_info = []
+    sw_vers_cmd = ['/usr/bin/sw_vers']
+    try:
+        sw_vers_output = subprocess.check_output(sw_vers_cmd).splitlines()
+        for line in sw_vers_output:
+            if 'ProductVersion' in line:
+                build_info.insert(0, line.split("\t")[-1])
+            if 'BuildVersion' in line:
+                build_info.insert(1, line.split("\t")[-1])
+    except subprocess.CalledProcessError, err:
+        raise ReplicationError(err)
+    return build_info
 
 
 def get_seeding_program(sucatalog_url):
@@ -55,17 +116,24 @@ def get_seeding_program(sucatalog_url):
         for key, value in seed_catalogs.items():
             if sucatalog_url == value:
                 return key
+        return ''
     except (OSError, ExpatError, AttributeError, KeyError):
-        return None
+        return ''
 
 
-def get_seed_catalog():
+def get_seed_catalog(seedname='DeveloperSeed'):
     '''Returns the developer seed sucatalog'''
     try:
         seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
-        return seed_catalogs.get('DeveloperSeed', DEFAULT_SUCATALOG)
+        return seed_catalogs.get(seedname)
     except (OSError, ExpatError, AttributeError, KeyError):
-        return DEFAULT_SUCATALOG
+        return ''
+
+
+def get_default_catalog():
+    '''Returns the default softwareupdate catalog for the current OS'''
+    darwin_major = os.uname()[2].split('.')[0]
+    return DEFAULT_SUCATALOGS.get(darwin_major)
 
 
 def make_sparse_image(volume_name, output_path):
@@ -163,8 +231,11 @@ class ReplicationError(Exception):
     pass
 
 
-def replicate_url(full_url, root_dir='/tmp',
-                  show_progress=False, ignore_cache=False):
+def replicate_url(full_url,
+                  root_dir='/tmp',
+                  show_progress=False,
+                  ignore_cache=False,
+                  attempt_resume=False):
     '''Downloads a URL and stores it in the same relative path on our
     filesystem. Returns a path to the replicated file.'''
 
@@ -180,6 +251,8 @@ def replicate_url(full_url, root_dir='/tmp',
                 '-o', local_file_path]
     if not ignore_cache and os.path.exists(local_file_path):
         curl_cmd.extend(['-z', local_file_path])
+        if attempt_resume:
+            curl_cmd.extend(['-C', '-'])
     curl_cmd.append(full_url)
     print "Downloading %s..." % full_url
     try:
@@ -269,6 +342,30 @@ def parse_dist(filename):
     return dist_info
 
 
+def get_board_ids(filename):
+    '''Parses a softwareupdate dist file, returning a list of supported
+    Board IDs'''
+    supported_board_ids = ""
+    with open(filename) as search:
+        for line in search:
+            line = line.rstrip()  # remove '\n' at end of line
+            if 'boardIds' in line:
+                supported_board_ids = line.split(" ")[-1][:-1]
+                return supported_board_ids
+
+
+def get_unsupported_models(filename):
+    '''Parses a softwareupdate dist file, returning a list of non-supported
+    ModelIdentifiers'''
+    unsupported_models = ""
+    with open(filename) as search:
+        for line in search:
+            line = line.rstrip()  # remove '\n' at end of line
+            if 'nonSupportedModels' in line:
+                unsupported_models = line.split(" ")[-1][:-1]
+                return unsupported_models
+
+
 def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
     '''Downloads and returns a parsed softwareupdate catalog'''
     try:
@@ -278,8 +375,8 @@ def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
         print >> sys.stderr, 'Could not replicate %s: %s' % (sucatalog, err)
         exit(-1)
     if os.path.splitext(localcatalogpath)[1] == '.gz':
-        with gzip.open(localcatalogpath) as f:
-            content = f.read()
+        with gzip.open(localcatalogpath) as the_file:
+            content = the_file.read()
             try:
                 catalog = plistlib.readPlistFromString(content)
                 return catalog
@@ -334,9 +431,21 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
             print >> sys.stderr, 'Could not replicate %s: %s' % (dist_url, err)
         dist_info = parse_dist(dist_path)
         product_info[product_key]['DistributionPath'] = dist_path
+        unsupported_models = get_unsupported_models(dist_path)
+        product_info[product_key]['UnsupportedModels'] = unsupported_models
+        board_ids = get_board_ids(dist_path)
+        product_info[product_key]['BoardIDs'] = board_ids
         product_info[product_key].update(dist_info)
 
     return product_info
+
+
+def get_lowest_version(current_item, lowest_item):
+    '''Compares versions between two values and returns the lowest value'''
+    if LooseVersion(current_item) < LooseVersion(lowest_item):
+        return current_item
+    else:
+        return lowest_item
 
 
 def replicate_product(catalog, product_id, workdir, ignore_cache=False):
@@ -350,7 +459,8 @@ def replicate_product(catalog, product_id, workdir, ignore_cache=False):
             try:
                 replicate_url(
                     package['URL'], root_dir=workdir,
-                    show_progress=True, ignore_cache=ignore_cache)
+                    show_progress=True, ignore_cache=ignore_cache,
+                    attempt_resume=(not ignore_cache))
             except ReplicationError, err:
                 print >> sys.stderr, (
                     'Could not replicate %s: %s' % (package['URL'], err))
@@ -377,14 +487,23 @@ def find_installer_app(mountpoint):
 
 def main():
     '''Do the main thing here'''
+
+    print ('\n'
+           'installinstallmacos.py - get macOS installers '
+           'from the Apple software catalog'
+           '\n')
+
     if os.getuid() != 0:
         sys.exit('This command requires root (to install packages), so please '
                  'run again with sudo or as root.')
 
     parser = argparse.ArgumentParser()
-    parser.add_argument('--catalogurl', metavar='sucatalog_url',
-                        default=get_seed_catalog(),
-                        help='Software Update catalog URL.')
+    parser.add_argument('--seedprogram', default='',
+                        help='Which Seed Program catalog to use. Valid values '
+                        'are CustomerSeed, DeveloperSeed, and PublicSeed.')
+    parser.add_argument('--catalogurl', default='',
+                        help='Software Update catalog URL. This option '
+                        'overrides any seedprogram option.')
     parser.add_argument('--workdir', metavar='path_to_working_dir',
                         default='.',
                         help='Path to working directory on a volume with over '
@@ -403,9 +522,39 @@ def main():
                         help='Ignore any previously cached files.')
     args = parser.parse_args()
 
+    if args.catalogurl:
+        su_catalog_url = args.catalogurl
+    elif args.seedprogram:
+        su_catalog_url = get_seed_catalog(args.seedprogram)
+        if not su_catalog_url:
+            print >> sys.stderr, (
+                'Could not find a catalog url for seed program %s'
+                % args.seedprogram)
+            exit(-1)
+    else:
+        su_catalog_url = get_default_catalog()
+        if not su_catalog_url:
+            print >> sys.stderr, (
+                'Could not find a default catalog url for this OS version.')
+            exit(-1)
+
+    # show this Mac's info
+    hw_model = get_hw_model()
+    board_id = get_board_id()
+    build_info = get_current_build_info()
+    is_vm = is_a_vm()
+
+    print "This Mac:"
+    if is_vm == True:
+        print "Identified as a Virtual Machine"
+    print "%-17s: %s" % ('Model Identifier', hw_model)
+    print "%-17s: %s" % ('Board ID', board_id)
+    print "%-17s: %s" % ('OS Version', build_info[0])
+    print "%-17s: %s\n" % ('Build ID', build_info[1])
+
     # download sucatalog and look for products that are for macOS installers
     catalog = download_and_parse_sucatalog(
-        args.catalogurl, args.workdir, ignore_cache=args.ignore_cache)
+        su_catalog_url, args.workdir, ignore_cache=args.ignore_cache)
     product_info = os_installer_product_info(
         catalog, args.workdir, ignore_cache=args.ignore_cache)
 
@@ -415,16 +564,26 @@ def main():
         exit(-1)
 
     # display a menu of choices (some seed catalogs have multiple installers)
-    print '%2s %12s %10s %8s %11s  %s' % ('#', 'ProductID', 'Version',
-                                     'Build', 'Post Date', 'Title')
+    print '\n%2s  %-15s %-10s %-8s %-11s %-30s %s' % ('#', 'ProductID', 'Version',
+                                                      'Build', 'Post Date',
+                                                      'Title', 'Notes')
     for index, product_id in enumerate(product_info):
-        print '%2s %12s %10s %8s %11s  %s' % (
+        validation_string = ''
+        if hw_model in product_info[product_id]['UnsupportedModels'] and is_vm == False:
+            validation_string = 'Unsupported Model Identifier'
+        elif board_id not in product_info[product_id]['BoardIDs'] and is_vm == False:
+            validation_string = 'Unsupported Board ID'
+        elif get_lowest_version(build_info[0],product_info[product_id]['version']) != build_info[0]:
+            validation_string = 'Unsupported macOS version'
+
+        print '%2s  %-15s %-10s %-8s %-11s %-30s %s' % (
             index + 1,
             product_id,
             product_info[product_id]['version'],
             product_info[product_id]['BUILD'],
             product_info[product_id]['PostDate'].strftime('%Y-%m-%d'),
-            product_info[product_id]['title']
+            product_info[product_id]['title'],
+            validation_string
         )
 
     answer = raw_input(
