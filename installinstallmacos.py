@@ -32,6 +32,7 @@ import subprocess
 import sys
 import urlparse
 import xattr
+import re
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
 from distutils.version import LooseVersion
@@ -71,10 +72,10 @@ def get_board_id():
 def is_a_vm():
     '''Determines if the script is being run in a virtual machine'''
     sysctl_cmd = ['/usr/sbin/sysctl', 'machdep.cpu.features']
+    is_vm = False
     try:
         sysctl_output = subprocess.check_output(sysctl_cmd)
         cpu_features = sysctl_output.split(" ")
-        is_vm = False
         for i in range(len(cpu_features)):
             if cpu_features[i] == "VMM":
                 is_vm = True
@@ -345,28 +346,41 @@ def parse_dist(filename):
     return dist_info
 
 
-def get_board_ids(filename):
-    '''Parses a softwareupdate dist file, returning a list of supported
-    Board IDs'''
-    supported_board_ids = ""
-    with open(filename) as search:
-        for line in search:
-            line = line.rstrip()  # remove '\n' at end of line
-            if 'var boardIds =' in line:
-                supported_board_ids = line.split(" ")[-1][:-1]
-                return supported_board_ids
+def get_board_ids_and_unsupported_models(filename):
+    '''Parses a softwareupdate dist file, returning lists of supported
+    Board IDs and unsupported ModelIdentifiers'''
 
+    board_ids_list = []
+    unsupported_models_list = []
+    try:
+        dom = minidom.parse(filename)
+    except ExpatError:
+        print >> sys.stderr, 'Invalid XML in %s' % filename
+        return dist_info
+    except IOError, err:
+        print >> sys.stderr, 'Error reading %s: %s' % (filename, err)
+        return dist_info
 
-def get_unsupported_models(filename):
-    '''Parses a softwareupdate dist file, returning a list of non-supported
-    ModelIdentifiers'''
-    unsupported_models = ""
-    with open(filename) as search:
-        for line in search:
-            line = line.rstrip()  # remove '\n' at end of line
-            if 'nonSupportedModels' in line:
-                unsupported_models = line.split(" ")[-1][:-1]
-                return unsupported_models
+    dist_scripts = dom.getElementsByTagName('script')
+
+    # loop through the script keys, pass if empty.
+    if not dist_scripts:
+        return board_ids_list, unsupported_models_list
+    else:
+        for node in dist_scripts:
+            try:
+                node_list = node.firstChild.data.splitlines()
+                for line in node_list:
+                    if 'var boardIds =' in line:
+                        board_ids = line
+                        board_ids_list = re.findall('\'([^\']*)\'', board_ids)
+                    if 'var nonSupportedModels =' in line:
+                        unsupported_models = line
+                        unsupported_models_list = re.findall('\'([^\']*)\'',
+                                                             unsupported_models)
+            except AttributeError:
+                pass
+        return board_ids_list, unsupported_models_list
 
 
 def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
@@ -434,10 +448,9 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
             print >> sys.stderr, 'Could not replicate %s: %s' % (dist_url, err)
         dist_info = parse_dist(dist_path)
         product_info[product_key]['DistributionPath'] = dist_path
-        unsupported_models = get_unsupported_models(dist_path)
-        product_info[product_key]['UnsupportedModels'] = unsupported_models
-        board_ids = get_board_ids(dist_path)
-        product_info[product_key]['BoardIDs'] = board_ids
+        board_ids_list, unsupported_models_list = get_board_ids_and_unsupported_models(dist_path)
+        product_info[product_key]['UnsupportedModels'] = unsupported_models_list
+        product_info[product_key]['BoardIDs'] = board_ids_list
         product_info[product_key].update(dist_info)
 
     return product_info
@@ -569,15 +582,20 @@ def main():
     # display a menu of choices (some seed catalogs have multiple installers)
     print '\n%2s  %-15s %-10s %-8s %-11s %-30s %s' % ('#', 'ProductID', 'Version',
                                                       'Build', 'Post Date',
-                                                      'Title', 'Notes')
+                                                      'Title', 'Compatibility with this Mac')
     for index, product_id in enumerate(product_info):
         validation_string = ''
-        if hw_model in product_info[product_id]['UnsupportedModels'] and is_vm == False:
-            validation_string = 'Unsupported Model Identifier'
-        elif board_id not in product_info[product_id]['BoardIDs'] and is_vm == False:
-            validation_string = 'Unsupported Board ID'
-        elif get_lowest_version(build_info[0],product_info[product_id]['version']) != build_info[0]:
-            validation_string = 'Unsupported macOS version'
+        unsupported_models_list = product_info[product_id]['UnsupportedModels']
+        supported_boards_list = product_info[product_id]['BoardIDs']
+        product_version = product_info[product_id]['version']
+
+        if get_lowest_version(build_info[0],product_version) != build_info[0]:
+            validation_string = 'macOS version too old'
+        if is_vm == False:
+            if len(unsupported_models_list) > 0 and hw_model in unsupported_models_list:
+                validation_string = 'Incompatible ModelIdentifier'
+            elif len(supported_boards_list) > 0 and board_id not in supported_boards_list:
+                validation_string = 'Incompatible Board ID'
 
         print '%2s  %-15s %-10s %-8s %-11s %-30s %s' % (
             index + 1,
