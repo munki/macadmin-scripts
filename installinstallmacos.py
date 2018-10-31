@@ -66,7 +66,7 @@ def get_board_id():
                 return board_id
     except subprocess.CalledProcessError, err:
         print "Board ID could not be identified. Error was: %s" % err
-        return ''
+    return 'Not identified'
 
 
 def is_a_vm():
@@ -90,27 +90,27 @@ def get_hw_model():
     try:
         sysctl_output = subprocess.check_output(sysctl_cmd)
         hw_model = sysctl_output.split(" ")[-1].split("\n")[0]
+        return hw_model
     except subprocess.CalledProcessError, err:
         print "Hardware model could not be identified. Error was: %s" % err
-        return ''
-    return hw_model
+    return 'Not identified'
 
 
 def get_current_build_info():
     '''Gets the local system build'''
-    build_info = []
     sw_vers_cmd = ['/usr/bin/sw_vers']
+    this_mac_os_version = 'Not identified'
+    this_mac_build_id = 'Not identified'
     try:
         sw_vers_output = subprocess.check_output(sw_vers_cmd).splitlines()
         for line in sw_vers_output:
             if 'ProductVersion' in line:
-                build_info.insert(0, line.split("\t")[-1])
+                this_mac_os_version = line.split("\t")[-1]
             if 'BuildVersion' in line:
-                build_info.insert(1, line.split("\t")[-1])
-        return build_info
+                this_mac_build_id = line.split("\t")[-1]
     except subprocess.CalledProcessError, err:
         print "Current build could not be identified. Error was: %s" % err
-        return ''
+    return this_mac_os_version, this_mac_build_id
 
 
 def get_seeding_program(sucatalog_url):
@@ -555,18 +555,18 @@ def main():
             exit(-1)
 
     # show this Mac's info
-    hw_model = get_hw_model()
-    board_id = get_board_id()
-    build_info = get_current_build_info()
-    is_vm = is_a_vm()
+    this_mac_hw_model = get_hw_model()
+    this_mac_board_id = get_board_id()
+    this_mac_os_version, this_mac_build_id = get_current_build_info()
+    this_mac_is_a_vm = is_a_vm()
 
     print "This Mac:"
-    if is_vm == True:
+    if this_mac_is_a_vm == True:
         print "Identified as a Virtual Machine"
-    print "%-17s: %s" % ('Model Identifier', hw_model)
-    print "%-17s: %s" % ('Board ID', board_id)
-    print "%-17s: %s" % ('OS Version', build_info[0])
-    print "%-17s: %s\n" % ('Build ID', build_info[1])
+    print "%-17s: %s" % ('Model Identifier', this_mac_hw_model)
+    print "%-17s: %s" % ('Board ID', this_mac_board_id)
+    print "%-17s: %s" % ('OS Version', this_mac_os_version)
+    print "%-17s: %s\n" % ('Build ID', this_mac_build_id)
 
     # download sucatalog and look for products that are for macOS installers
     catalog = download_and_parse_sucatalog(
@@ -589,12 +589,12 @@ def main():
         supported_boards_list = product_info[product_id]['BoardIDs']
         product_version = product_info[product_id]['version']
 
-        if get_lowest_version(build_info[0],product_version) != build_info[0]:
+        if get_lowest_version(this_mac_os_version,product_version) != this_mac_os_version:
             validation_string = 'macOS version too old'
-        if is_vm == False:
-            if len(unsupported_models_list) > 0 and hw_model in unsupported_models_list:
+        if this_mac_is_a_vm == False:
+            if len(unsupported_models_list) > 0 and this_mac_hw_model in unsupported_models_list:
                 validation_string = 'Incompatible ModelIdentifier'
-            elif len(supported_boards_list) > 0 and board_id not in supported_boards_list:
+            elif len(supported_boards_list) > 0 and this_mac_board_id not in supported_boards_list:
                 validation_string = 'Incompatible Board ID'
 
         print '%2s  %-15s %-10s %-8s %-11s %-30s %s' % (
