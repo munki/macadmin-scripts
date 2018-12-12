@@ -694,14 +694,25 @@ def main():
             exit(0)
         else:
             print '\nBuild %s available. Downloading #%s...\n' % (os_build, answer)
-    elif args.auto or args.version:
+    elif args.version:
         try:
             answer
         except NameError:
             print ('\n'
                    'Item # %s is not available. '
+                   'Run again without --version argument '
+                   'to select a valid build to download.\n' % args.version)
+            exit(0)
+        else:
+            print '\nBuild %s selected. Downloading #%s...\n' % (lowest_valid_build, answer)
+    elif args.auto:
+        try:
+            answer
+        except NameError:
+            print ('\n'
+                   'No valid version available. '
                    'Run again without --auto argument '
-                   'to select a valid build to download.\n' % answer)
+                   'to select a valid build to download.\n')
             exit(0)
         else:
             print '\nBuild %s selected. Downloading #%s...\n' % (lowest_valid_build, answer)
