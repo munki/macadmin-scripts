@@ -29,13 +29,11 @@ import gzip
 import os
 import plistlib
 import subprocess
-import re
 import sys
 import urlparse
 import xattr
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
-from operator import itemgetter
 from distutils.version import LooseVersion
 
 
@@ -366,6 +364,7 @@ def get_unsupported_models(filename):
             if 'nonSupportedModels' in line:
                 unsupported_models = line.split(" ")[-1][:-1]
                 return unsupported_models
+            
 
 def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
     '''Downloads and returns a parsed softwareupdate catalog'''
@@ -539,8 +538,12 @@ def main():
                         'for the current device.')
     parser.add_argument('--version', metavar='match_version',
                         default='',
-                        help='Selects the lowest valid build ID matching'
-                        'the selected version.')
+                        help='Selects the lowest valid build ID matching '
+                        'the selected version (e.g. 10.14.3).')
+    parser.add_argument('--os', metavar='match_os',
+                        default='',
+                        help='Selects the lowest valid build ID matching '
+                        'the selected OS version (e.g. 10.14).')
     args = parser.parse_args()
 
     # show this Mac's info
@@ -618,16 +621,23 @@ def main():
 
         # skip if build is not suitable for current device
         # and a validation parameter was chosen
-        if not_valid and (args.validate or args.auto or args.version):
+        if not_valid and (args.validate or args.auto or args.version or args.os):
             continue
 
         # skip if a version is selected and it does not match
         if args.version and args.version != product_info[product_id]['version']:
             continue
 
+        # skip if a version is selected and it does not match
+        if args.os:
+            major = product_info[product_id]['version'].split('.', 2)[:2]
+            os_version = '.'.join(major)
+            if args.os != os_version:
+                continue
+
         # determine the lowest valid build ID and select this
         # when using auto and version options
-        if (args.auto or args.version) and 'Beta' not in product_info[product_id]['title']:
+        if (args.auto or args.version or args.os) and 'Beta' not in product_info[product_id]['title']:
             try:
                 lowest_valid_build
             except NameError:
@@ -702,6 +712,17 @@ def main():
                    'Item # %s is not available. '
                    'Run again without --version argument '
                    'to select a valid build to download.\n' % args.version)
+            exit(0)
+        else:
+            print '\nBuild %s selected. Downloading #%s...\n' % (lowest_valid_build, answer)
+    elif args.os:
+        try:
+            answer
+        except NameError:
+            print ('\n'
+                   'Item # %s is not available. '
+                   'Run again without --os argument '
+                   'to select a valid build to download.\n' % args.os)
             exit(0)
         else:
             print '\nBuild %s selected. Downloading #%s...\n' % (lowest_valid_build, answer)
