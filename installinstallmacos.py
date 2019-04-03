@@ -130,6 +130,15 @@ def get_seed_catalog(seedname='DeveloperSeed'):
         return ''
 
 
+def get_seeding_programs():
+    '''Returns the list of seeding program names'''
+    try:
+        seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
+        return seed_catalogs.keys()
+    except (OSError, ExpatError, AttributeError, KeyError):
+        return ''
+
+
 def get_default_catalog():
     '''Returns the default softwareupdate catalog for the current OS'''
     darwin_major = os.uname()[2].split('.')[0]
@@ -500,7 +509,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--seedprogram', default='',
                         help='Which Seed Program catalog to use. Valid values '
-                        'are CustomerSeed, DeveloperSeed, and PublicSeed.')
+                        'are %s.' % ', '.join(get_seeding_programs()))
     parser.add_argument('--catalogurl', default='',
                         help='Software Update catalog URL. This option '
                         'overrides any seedprogram option.')
@@ -568,6 +577,9 @@ def main():
             print >> sys.stderr, (
                 'Could not find a catalog url for seed program %s'
                 % args.seedprogram)
+            print >> sys.stderr, (
+                'Valid seeding programs are: %s'
+                % ', '.join(get_seeding_programs()))
             exit(-1)
     else:
         su_catalog_url = get_default_catalog()
