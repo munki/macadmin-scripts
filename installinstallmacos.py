@@ -373,7 +373,7 @@ def get_unsupported_models(filename):
             if 'nonSupportedModels' in line:
                 unsupported_models = line.split(" ")[-1][:-1]
                 return unsupported_models
-            
+
 
 def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
     '''Downloads and returns a parsed softwareupdate catalog'''
@@ -691,6 +691,9 @@ def main():
     # Output a plist of available updates and quit if list option chosen
     if args.list:
         plistlib.writePlist(pl, output_plist)
+        print ('\n'
+               'Valid seeding programs are: %s'
+               % ', '.join(get_seeding_programs()))
         exit(0)
 
     # check for validity of specified build if argument supplied
