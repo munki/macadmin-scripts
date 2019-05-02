@@ -67,7 +67,7 @@ def get_seeding_program(sucatalog_url):
     '''Returns a seeding program name based on the sucatalog_url'''
     try:
         seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
-        for key, value in list(seed_catalogs.items()):
+        for key, value in seed_catalogs.items():
             if sucatalog_url == value:
                 return key
         return ''
@@ -341,8 +341,7 @@ def find_mac_os_installers(catalog):
     installers'''
     mac_os_installer_products = []
     if 'Products' in catalog:
-        product_keys = list(catalog['Products'].keys())
-        for product_key in product_keys:
+        for product_key in catalog['Products'].keys():
             product = catalog['Products'][product_key]
             try:
                 if product['ExtendedMetaInfo'][
