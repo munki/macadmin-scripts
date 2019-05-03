@@ -129,8 +129,8 @@ def make_compressed_dmg(app_path, diskimagepath):
     """Returns path to newly-created compressed r/o disk image containing
     Install macOS.app"""
 
-    print(('Making read-only compressed disk image containing %s...'
-           % os.path.basename(app_path)))
+    print('Making read-only compressed disk image containing %s...'
+          % os.path.basename(app_path))
     cmd = ['/usr/bin/hdiutil', 'create', '-fs', 'HFS+',
            '-srcfolder', app_path, diskimagepath]
     try:
@@ -265,8 +265,7 @@ def get_server_metadata(catalog, product_key, workdir, ignore_cache=False):
                 url, root_dir=workdir, ignore_cache=ignore_cache)
             return smd_path
         except ReplicationError as err:
-            print((
-                'Could not replicate %s: %s' % (url, err)), file=sys.stderr)
+            print('Could not replicate %s: %s' % (url, err), file=sys.stderr)
             return None
     except KeyError:
         print('Malformed catalog.', file=sys.stderr)
@@ -404,9 +403,8 @@ def replicate_product(catalog, product_id, workdir, ignore_cache=False):
                 replicate_url(package['MetadataURL'], root_dir=workdir,
                               ignore_cache=ignore_cache)
             except ReplicationError as err:
-                print((
-                    'Could not replicate %s: %s'
-                    % (package['MetadataURL'], err)), file=sys.stderr)
+                print('Could not replicate %s: %s'
+                      % (package['MetadataURL'], err), file=sys.stderr)
                 exit(-1)
 
 
@@ -455,12 +453,10 @@ def main():
     elif args.seedprogram:
         su_catalog_url = get_seed_catalog(args.seedprogram)
         if not su_catalog_url:
-            print((
-                'Could not find a catalog url for seed program %s'
-                % args.seedprogram), file=sys.stderr)
-            print((
-                'Valid seeding programs are: %s'
-                % ', '.join(get_seeding_programs())), file=sys.stderr)
+            print('Could not find a catalog url for seed program %s'
+                  % args.seedprogram, file=sys.stderr)
+            print('Valid seeding programs are: %s'
+                  % ', '.join(get_seeding_programs()), file=sys.stderr)
             exit(-1)
     else:
         su_catalog_url = get_default_catalog()
