@@ -679,7 +679,7 @@ def main():
 
         elif args.current:
             # automatically select matching build ID if current option used
-            if os_build == product_info[product_id]['BUILD']:
+            if build_info[0] == product_info[product_id]['BUILD']:
                 answer = index+1
                 break
 
@@ -715,10 +715,10 @@ def main():
             print ('\n'
                    'Build %s is not available. '
                    'Run again without --current argument '
-                   'to select a valid build to download.\n' % os_build)
+                   'to select a valid build to download.\n' % build_info[0])
             exit(0)
         else:
-            print '\nBuild %s available. Downloading #%s...\n' % (os_build, answer)
+            print '\nBuild %s available. Downloading #%s...\n' % (build_info[0], answer)
     elif args.version:
         try:
             answer
