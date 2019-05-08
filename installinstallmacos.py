@@ -60,7 +60,7 @@ def get_board_id():
         ioreg_output = subprocess.check_output(ioreg_cmd).splitlines()
         for line in ioreg_output:
             if 'board-id' in line:
-                board_id = line.split(" ")[-1]
+                board_id = line.split("<")[-1]
                 board_id = board_id[board_id.find('<"')+2:board_id.find('">')]
                 return board_id
     except subprocess.CalledProcessError, err:
