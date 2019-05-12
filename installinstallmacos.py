@@ -69,10 +69,29 @@ def get_input(prompt=None):
         return input(prompt)
 
 
+def readPlist(filepath):
+    '''Wrapper for the differences between Python 2 and Python 3's plistlib'''
+    try:
+        with open(filepath, "rb") as fileobj:
+            return plistlib.load(fileobj)
+    except AttributeError:
+        # plistlib module doesn't have a load function (as in Python 2)
+        return plistlib.readPlist(filepath)
+
+
+def readPlistFromString(bytestring):
+    '''Wrapper for the differences between Python 2 and Python 3's plistlib'''
+    try:
+       return plistlib.loads(bytestring)
+    except AttributeError:
+        # plistlib module doesn't have a load function (as in Python 2)
+        return plistlib.readPlistFromString(bytestring)
+
+
 def get_seeding_program(sucatalog_url):
     '''Returns a seeding program name based on the sucatalog_url'''
     try:
-        seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
+        seed_catalogs = readPlist(SEED_CATALOGS_PLIST)
         for key, value in seed_catalogs.items():
             if sucatalog_url == value:
                 return key
@@ -84,7 +103,7 @@ def get_seeding_program(sucatalog_url):
 def get_seed_catalog(seedname='DeveloperSeed'):
     '''Returns the developer seed sucatalog'''
     try:
-        seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
+        seed_catalogs = readPlist(SEED_CATALOGS_PLIST)
         return seed_catalogs.get(seedname)
     except (OSError, ExpatError, AttributeError, KeyError):
         return ''
@@ -93,7 +112,7 @@ def get_seed_catalog(seedname='DeveloperSeed'):
 def get_seeding_programs():
     '''Returns the list of seeding program names'''
     try:
-        seed_catalogs = plistlib.readPlist(SEED_CATALOGS_PLIST)
+        seed_catalogs = readPlist(SEED_CATALOGS_PLIST)
         return list(seed_catalogs.keys())
     except (OSError, ExpatError, AttributeError, KeyError):
         return ''
@@ -115,7 +134,7 @@ def make_sparse_image(volume_name, output_path):
         print(err, file=sys.stderr)
         exit(-1)
     try:
-        return plistlib.readPlistFromString(output)[0]
+        return readPlistFromString(output)[0]
     except IndexError as err:
         print('Unexpected output from hdiutil: %s' % output, file=sys.stderr)
         exit(-1)
@@ -158,7 +177,7 @@ def mountdmg(dmgpath):
               file=sys.stderr)
         return None
     if pliststr:
-        plist = plistlib.readPlistFromString(pliststr)
+        plist = readPlistFromString(pliststr)
         for entity in plist['system-entities']:
             if 'mount-point' in entity:
                 mountpoints.append(entity['mount-point'])
@@ -239,7 +258,7 @@ def parse_server_metadata(filename):
     title = ''
     vers = ''
     try:
-        md_plist = plistlib.readPlist(filename)
+        md_plist = readPlist(filename)
     except (OSError, IOError, ExpatError) as err:
         print('Error reading %s: %s' % (filename, err), file=sys.stderr)
         return {}
@@ -323,7 +342,7 @@ def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
         with gzip.open(localcatalogpath) as the_file:
             content = the_file.read()
             try:
-                catalog = plistlib.readPlistFromString(content)
+                catalog = readPlistFromString(content)
                 return catalog
             except ExpatError as err:
                 print('Error reading %s: %s' % (localcatalogpath, err),
@@ -331,7 +350,7 @@ def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
                 exit(-1)
     else:
         try:
-            catalog = plistlib.readPlist(localcatalogpath)
+            catalog = readPlist(localcatalogpath)
             return catalog
         except (OSError, IOError, ExpatError) as err:
             print('Error reading %s: %s' % (localcatalogpath, err),
