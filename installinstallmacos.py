@@ -393,9 +393,10 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
         except ReplicationError as err:
             print('Could not replicate %s: %s' % (dist_url, err),
                   file=sys.stderr)
-        dist_info = parse_dist(dist_path)
-        product_info[product_key]['DistributionPath'] = dist_path
-        product_info[product_key].update(dist_info)
+        else:
+            dist_info = parse_dist(dist_path)
+            product_info[product_key]['DistributionPath'] = dist_path
+            product_info[product_key].update(dist_info)
 
     return product_info
 
