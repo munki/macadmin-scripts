@@ -485,12 +485,12 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
     return product_info
 
 
-def get_lowest_version(current_item, lowest_item):
-    '''Compares versions between two values and returns the lowest value'''
-    if LooseVersion(current_item) < LooseVersion(lowest_item):
+def get_latest_version(current_item, latest_item):
+    '''Compares versions between two values and returns the latest (highest) value'''
+    if LooseVersion(current_item) > LooseVersion(latest_item):
         return current_item
     else:
-        return lowest_item
+        return latest_item
 
 
 def replicate_product(catalog, product_id, workdir, ignore_cache=False):
@@ -580,13 +580,16 @@ def main():
     parser.add_argument('--auto', action='store_true',
                         help='Automatically select the appropriate valid build '
                         'for the current device.')
+    parser.add_argument('--beta', action='store_true',
+                        help='Include beta versions in the selection '
+                        '(in conjunction with --auto, --os or --version)')
     parser.add_argument('--version', metavar='match_version',
                         default='',
-                        help='Selects the lowest valid build ID matching '
+                        help='Selects the latest valid build ID matching '
                         'the selected version (e.g. 10.14.3).')
     parser.add_argument('--os', metavar='match_os',
                         default='',
-                        help='Selects the lowest valid build ID matching '
+                        help='Selects the latest valid build ID matching '
                         'the selected OS version (e.g. 10.14).')
     args = parser.parse_args()
 
@@ -647,7 +650,7 @@ def main():
             not_valid = 'Unsupported Model Identifier'
         elif board_id not in product_info[product_id]['BoardIDs'] and is_vm == False:
             not_valid = 'Unsupported Board ID'
-        elif get_lowest_version(build_info[0],product_info[product_id]['version']) != build_info[0]:
+        elif get_latest_version(build_info[0],product_info[product_id]['version']) != build_info[0]:
             not_valid = 'Unsupported macOS version'
         else:
             valid_build_found = True
@@ -680,20 +683,21 @@ def main():
             if args.os != os_version:
                 continue
 
-        # determine the lowest valid build ID and select this
+        # determine the latest valid build ID and select this
         # when using auto and version options
-        if (args.auto or args.version or args.os) and 'Beta' not in product_info[product_id]['title']:
-            try:
-                lowest_valid_build
-            except NameError:
-                lowest_valid_build = product_info[product_id]['BUILD']
-                answer = index+1
-            else:
-                lowest_valid_build = get_lowest_version(
-                                        product_info[product_id]['BUILD'],
-                                        lowest_valid_build)
-                if lowest_valid_build == product_info[product_id]['BUILD']:
+        if (args.auto or args.version or args.os):
+            if (args.beta or 'Beta' not in product_info[product_id]['title']):
+                try:
+                    latest_valid_build
+                except NameError:
+                    latest_valid_build = product_info[product_id]['BUILD']
                     answer = index+1
+                else:
+                    latest_valid_build = get_latest_version(
+                                            product_info[product_id]['BUILD'],
+                                            latest_valid_build)
+                    if latest_valid_build == product_info[product_id]['BUILD']:
+                        answer = index+1
 
         # Write this build info to plist
         pl_index =  {'index': index+1,
@@ -768,7 +772,7 @@ def main():
         else:
             print('\n'
                   'Build %s selected. Downloading #%s...\n'
-                  % (lowest_valid_build, answer))
+                  % (latest_valid_build, answer))
     elif args.os:
         try:
             answer
@@ -781,7 +785,7 @@ def main():
         else:
             print('\n'
                   'Build %s selected. Downloading #%s...\n'
-                  % (lowest_valid_build, answer))
+                  % (latest_valid_build, answer))
     elif args.auto:
         try:
             answer
@@ -794,7 +798,7 @@ def main():
         else:
             print('\n'
                   'Build %s selected. Downloading #%s...\n'
-                  % (lowest_valid_build, answer))
+                  % (latest_valid_build, answer))
     else:
         # default option to interactively offer selection
         answer = get_input(
