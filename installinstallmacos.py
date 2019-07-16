@@ -650,7 +650,7 @@ def main():
             not_valid = 'Unsupported Model Identifier'
         elif board_id not in product_info[product_id]['BoardIDs'] and is_vm == False:
             not_valid = 'Unsupported Board ID'
-        elif get_latest_version(build_info[0],product_info[product_id]['version']) != build_info[0]:
+        elif get_latest_version(build_info[0],product_info[product_id]['version']) != product_info[product_id]['version']:
             not_valid = 'Unsupported macOS version'
         else:
             valid_build_found = True
