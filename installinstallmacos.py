@@ -266,11 +266,28 @@ def install_product(dist_path, target_vol):
     cmd = ['/usr/sbin/installer', '-pkg', dist_path, '-target', target_vol]
     try:
         subprocess.check_call(cmd)
-        return True
     except subprocess.CalledProcessError as err:
         print(err, file=sys.stderr)
         return False
-
+    else:
+        # Apple postinstall script bug ends up copying files to a path like
+        # /tmp/dmg.T9ak1HApplications
+        path = target_vol + 'Applications'
+        if os.path.exists(path):
+            print('*********************************************************')
+            print('*** Working around a very dumb Apple bug in a package ***')
+            print('*** postinstall script that fails to correctly target ***')
+            print('*** the Install macOS.app when installed to a volume  ***')
+            print('*** other than the current boot volume.               ***')
+            print('***       Please file feedback with Apple!            ***')
+            print('*********************************************************')
+            subprocess.check_call(
+                ['/usr/bin/ditto',
+                 path,
+                 os.path.join(target_vol, 'Applications')]
+            )
+            subprocess.check_call(['/bin/rm', '-r', path])
+        return True
 
 class ReplicationError(Exception):
     '''A custom error when replication fails'''
