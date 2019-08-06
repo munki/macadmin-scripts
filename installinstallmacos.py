@@ -63,7 +63,7 @@ SEED_CATALOGS_PLIST = (
 
 def get_board_id():
     '''Gets the local system board ID'''
-    ioreg_cmd = ['ioreg', '-p', 'IODeviceTree', '-r', '-n', '/', '-d', '1']
+    ioreg_cmd = ['/usr/sbin/ioreg', '-p', 'IODeviceTree', '-r', '-n', '/', '-d', '1']
     try:
         ioreg_output = subprocess.check_output(ioreg_cmd).splitlines()
         for line in ioreg_output:
