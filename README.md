@@ -43,6 +43,8 @@ Product installation failed.
 
 Use a compatible Mac or select a different build compatible with your current hardware and try again. You may also have success running the script in a VM; the InstallationCheck script in versions of the macOS installer to date skips the checks (and returns success) when run on a VM.
 
+Graham Pugh has a fork with a lot more features and bells and whistles. Check it out if your needs aren't met by this tool. https://github.com/grahampugh/macadmin-scripts
+
 #### make_firmwareupdater_pkg.sh
 
 This script was used to extract the firmware updaters from early High Sierra installers and make a standalone installer package that could be used to upgrade Mac firmware before installing High Sierra via imaging.
