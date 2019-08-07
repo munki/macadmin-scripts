@@ -3,19 +3,6 @@
 Some scripts that might be of use to macOS admins. Might be related to Munki;
 might not.
 
-#### createbootvolfromautonbi.py
-
-A tool to make bootable disk volumes from the output of autonbi. Especially
-useful to make bootable disks containing Imagr and the 'SIP-ignoring' kernel,
-which allows Imagr to run scripts that affect SIP state, set UAKEL options, and
-run the `startosinstall` component, all of which might otherwise require network
-booting from a NetInstall-style nbi.
-
-This provides a way to create a bootable external disk that acts like the Netboot environment used by/needed by Imagr.
-
-This command converts the output of Imagr's `make nbi` into a bootable external USB disk:
-`sudo ./createbootvolfromautonbi.py --nbi ~/Desktop/10.13.6_Imagr.nbi --volume /Volumes/ExternalDisk`
-
 #### installinstallmacos.py
 
 This script can create disk images containing macOS Installer applications available via Apple's softwareupdate catalogs.
@@ -44,6 +31,22 @@ Product installation failed.
 Use a compatible Mac or select a different build compatible with your current hardware and try again. You may also have success running the script in a VM; the InstallationCheck script in versions of the macOS installer to date skips the checks (and returns success) when run on a VM.
 
 Graham Pugh has a fork with a lot more features and bells and whistles. Check it out if your needs aren't met by this tool. https://github.com/grahampugh/macadmin-scripts
+
+#### createbootvolfromautonbi.py
+
+(This tool has not been tested/updated since before 10.14 shipped. It may not work as expected with current versions of macOS. There are currently no plans to update it.)
+
+A tool to make bootable disk volumes from the output of autonbi. Especially
+useful to make bootable disks containing Imagr and the 'SIP-ignoring' kernel,
+which allows Imagr to run scripts that affect SIP state, set UAKEL options, and
+run the `startosinstall` component, all of which might otherwise require network
+booting from a NetInstall-style nbi.
+
+This provides a way to create a bootable external disk that acts like the Netboot environment used by/needed by Imagr.
+
+This command converts the output of Imagr's `make nbi` into a bootable external USB disk:
+`sudo ./createbootvolfromautonbi.py --nbi ~/Desktop/10.13.6_Imagr.nbi --volume /Volumes/ExternalDisk`
+
 
 #### make_firmwareupdater_pkg.sh
 
