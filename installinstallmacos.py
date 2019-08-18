@@ -399,21 +399,22 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
     for product_key in installer_products:
         product_info[product_key] = {}
         filename = get_server_metadata(catalog, product_key, workdir)
-        product_info[product_key] = parse_server_metadata(filename)
-        product = catalog['Products'][product_key]
-        product_info[product_key]['PostDate'] = product['PostDate']
-        distributions = product['Distributions']
-        dist_url = distributions.get('English') or distributions.get('en')
-        try:
-            dist_path = replicate_url(
-                dist_url, root_dir=workdir, ignore_cache=ignore_cache)
-        except ReplicationError as err:
-            print('Could not replicate %s: %s' % (dist_url, err),
-                  file=sys.stderr)
-        else:
-            dist_info = parse_dist(dist_path)
-            product_info[product_key]['DistributionPath'] = dist_path
-            product_info[product_key].update(dist_info)
+        if filename:
+            product_info[product_key] = parse_server_metadata(filename)
+            product = catalog['Products'][product_key]
+            product_info[product_key]['PostDate'] = product['PostDate']
+            distributions = product['Distributions']
+            dist_url = distributions.get('English') or distributions.get('en')
+            try:
+                dist_path = replicate_url(
+                    dist_url, root_dir=workdir, ignore_cache=ignore_cache)
+            except ReplicationError as err:
+                print('Could not replicate %s: %s' % (dist_url, err),
+                      file=sys.stderr)
+            else:
+                dist_info = parse_dist(dist_path)
+                product_info[product_key]['DistributionPath'] = dist_path
+                product_info[product_key].update(dist_info)
 
     return product_info
 
