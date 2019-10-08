@@ -262,7 +262,7 @@ def replicate_url(full_url,
         if attempt_resume:
             curl_cmd.extend(['-C', '-'])
     curl_cmd.append(full_url)
-    print("Downloading %s..." % full_url)
+    print("Downloading %s..." % full_url, file=sys.stderr)
     try:
         subprocess.check_call(curl_cmd)
     except subprocess.CalledProcessError as err:
@@ -459,9 +459,9 @@ def find_installer_app(mountpoint):
 
 def main():
     '''Do the main thing here'''
-    if os.getuid() != 0:
-        sys.exit('This command requires root (to install packages), so please '
-                 'run again with sudo or as root.')
+#     if os.getuid() != 0:
+#         sys.exit('This command requires root (to install packages), so please '
+#                  'run again with sudo or as root.')
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--seedprogram', default='',
@@ -486,6 +486,11 @@ def main():
                         'less available disk space and is faster.')
     parser.add_argument('--ignore-cache', action='store_true',
                         help='Ignore any previously cached files.')
+                
+    parser.add_argument('--list', action='store_true',
+                        help='Output available product IDs and OS versions available in plist format and then exit')
+    parser.add_argument('--productid', metavar='productid',help='Use the specified product id. Skips prompting. Useful with --available-os-only option')
+
     args = parser.parse_args()
 
     if args.catalogurl:
@@ -516,30 +521,56 @@ def main():
               file=sys.stderr)
         exit(-1)
 
-    # display a menu of choices (some seed catalogs have multiple installers)
-    print('%2s %12s %10s %8s %11s  %s'
-          % ('#', 'ProductID', 'Version', 'Build', 'Post Date', 'Title'))
-    for index, product_id in enumerate(product_info):
-        print('%2s %12s %10s %8s %11s  %s' % (
-            index + 1,
-            product_id,
-            product_info[product_id]['version'],
-            product_info[product_id]['BUILD'],
-            product_info[product_id]['PostDate'].strftime('%Y-%m-%d'),
-            product_info[product_id]['title']
-        ))
-
-    answer = get_input(
-        '\nChoose a product to download (1-%s): ' % len(product_info))
-    try:
-        index = int(answer) - 1
-        if index < 0:
-            raise ValueError
-        product_id = list(product_info.keys())[index]
-    except (ValueError, IndexError):
-        print('Exiting.')
-        exit(0)
-
+    if args.productid:
+        product_id=args.productid    
+    else:
+        available_os={}
+        # display a menu of choices (some seed catalogs have multiple installers)
+        if args.list==False:
+            print('%2s %12s %10s %8s %11s  %s'
+                  % ('#', 'ProductID', 'Version', 'Build', 'Post Date', 'Title'))
+        for index, product_id in enumerate(product_info):
+            version=product_info[product_id]['version']
+            build=product_info[product_id]['BUILD']
+            post_date=product_info[product_id]['PostDate'].strftime('%Y-%m-%d')
+            title=product_info[product_id]['title']
+            if args.list==True:
+                available_os[product_id]={'version':version,
+                                      'build':build,
+                                  'post_date':post_date,
+                                      'title':title}
+            else:
+                print('%2s %12s %10s %8s %11s  %s' % (
+                    index + 1,
+                    product_id,
+                    version,
+                    build,
+                    post_date,
+                    title
+                ))
+    
+        if args.list==True:
+            print (plistlib.writePlistToString(available_os))
+            exit(0)
+    
+    if args.productid: 
+        if args.productid in product_info:
+            product_id=args.productid
+        else:
+            print("product id not found:" + args.productid,file=sys.stderr)
+            exit(-1)
+    else:
+        answer = get_input(
+            '\nChoose a product to download (1-%s): ' % len(product_info))
+        try:
+            index = int(answer) - 1
+            if index < 0:
+                raise ValueError
+            product_id = list(product_info.keys())[index]
+        except (ValueError, IndexError):
+            print('Exiting.')
+            exit(0)
+    
     # download all the packages for the selected product
     replicate_product(
         catalog, product_id, args.workdir, ignore_cache=args.ignore_cache)
