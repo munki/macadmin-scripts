@@ -459,9 +459,6 @@ def find_installer_app(mountpoint):
 
 def main():
     '''Do the main thing here'''
-#     if os.getuid() != 0:
-#         sys.exit('This command requires root (to install packages), so please '
-#                  'run again with sudo or as root.')
 
     parser = argparse.ArgumentParser()
     parser.add_argument('--seedprogram', default='',
@@ -509,6 +506,11 @@ def main():
             print('Could not find a default catalog url for this OS version.',
                   file=sys.stderr)
             exit(-1)
+
+    if args.list==False and os.getuid() != 0:
+        sys.exit('This command requires root (to install packages), so please '
+                 'run again with sudo or as root.')
+
 
     # download sucatalog and look for products that are for macOS installers
     catalog = download_and_parse_sucatalog(
