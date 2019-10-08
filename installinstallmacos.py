@@ -506,7 +506,8 @@ def main():
             print('Could not find a default catalog url for this OS version.',
                   file=sys.stderr)
             exit(-1)
-
+            
+    #listing doesn't require root so we allow it.
     if args.list==False and os.getuid() != 0:
         sys.exit('This command requires root (to install packages), so please '
                  'run again with sudo or as root.')
@@ -523,11 +524,13 @@ def main():
               file=sys.stderr)
         exit(-1)
 
+    #if product id is specified, skip menu or plist. If it is invalid, we will catch it later
     if args.productid:
         product_id=args.productid    
     else:
+        #build up a list for outputing as a plist, or just print as we read in the lines.
         available_os={}
-        # display a menu of choices (some seed catalogs have multiple installers)
+        # display a menu of choices (some seed catalogs have multiple installers) if not plist output
         if args.list==False:
             print('%2s %12s %10s %8s %11s  %s'
                   % ('#', 'ProductID', 'Version', 'Build', 'Post Date', 'Title'))
@@ -550,7 +553,7 @@ def main():
                     post_date,
                     title
                 ))
-    
+        #when done, output plist if that is what is requested, then exit cleanly
         if args.list==True:
             print (plistlib.writePlistToString(available_os))
             exit(0)
