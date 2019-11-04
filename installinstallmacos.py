@@ -485,8 +485,8 @@ def main():
     args = parser.parse_args()
 
     if os.getuid() != 0:
-    sys.exit('This command requires root (to install packages), so please '
-             'run again with sudo or as root.')
+        sys.exit('This command requires root (to install packages), so please '
+                 'run again with sudo or as root.')
     
     if args.catalogurl:
         su_catalog_url = args.catalogurl
