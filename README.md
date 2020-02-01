@@ -13,22 +13,8 @@ The tool assembles "Install macOS" applications by downloading the packages from
 
 If `/usr/bin/installer` returns errors during this process, it can be useful to examine `/var/log/install.log` for clues.
 
-Since it is using Apple's installer, any install check or volume check scripts are run. This means that you can only use this tool to create a diskimage containing the versions of macOS that will run on the exact machine you are running the script on.
-
-For example, to create a diskimage containing the version 10.13.6 that runs on 2018 MacBook Pros, you must run this script on a 2018 MacBook Pro, and choose the proper version.
-
-Typically "forked" OS build numbers are 4 digits, so when this document was last updated, build 17G2208 was the correct build for 2018 MacBook Pros; 17G65 was the correct build for all other Macs that support High Sierra.
-
-If you attempt to install an incompatible version of macOS, you'll see an error similar to the following:
-
-```
-Making empty sparseimage...
-installer: Error - ERROR_B14B14D9B7
-Command '['/usr/sbin/installer', '-pkg', './content/downloads/07/20/091-95774/awldiototubemmsbocipx0ic9lj2kcu0pt/091-95774.English.dist', '-target', '/private/tmp/dmg.Hf0PHy']' returned non-zero exit status 1
-Product installation failed.
-```
-
-Use a compatible Mac or select a different build compatible with your current hardware and try again. You may also have success running the script in a VM; the InstallationCheck script in versions of the macOS installer to date skips the checks (and returns success) when run on a VM.
+Disk images of "forked" OS builds can now be made from any Mac that supports the tool, because
+install checks on packages are bypassed with the `CM_BUILD` environmental variable set to `CM_BUILD`.
 
 Graham Pugh has a fork with a lot more features and bells and whistles. Check it out if your needs aren't met by this tool. https://github.com/grahampugh/macadmin-scripts
 
