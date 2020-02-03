@@ -265,6 +265,9 @@ def unmountdmg(mountpoint):
 def install_product(dist_path, target_vol):
     '''Install a product to a target volume.
     Returns a boolean to indicate success or failure.'''
+    # set CM_BUILD env var to make Installer bypass eligibilty checks
+    # when installing packages (for machine-specific OS builds)
+    os.environ["CM_BUILD"] = "CM_BUILD"
     cmd = ['/usr/sbin/installer', '-pkg', dist_path, '-target', target_vol]
     try:
         subprocess.check_call(cmd)
