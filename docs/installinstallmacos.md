@@ -11,7 +11,9 @@ This tool must be run as root or with `sudo`.
 
 #### Options
 
-`--catalogurl` Software Update catalog URL used by the tool. Defaults to `https://swscan.apple.com/content/catalogs/others/index-10.13seed-10.13-10.12-10.11-10.10-10.9-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog`
+`--catalogurl` Software Update catalog URL used by the tool. Defaults to the default softwareupdate catalog for the current OS if you run this tool under macOS 10.13-10.15.x.
+
+`--seedprogram SEEDPROGRAMNAME` Attempt to find and use the Seed catalog for the current OS. Use `installinstallmacos.py --help` to see the valid SeedProgram names for the current OS.
 
 `--workdir` Path to working directory on a volume with over 10G of available space. Defaults to current working directory.
 
