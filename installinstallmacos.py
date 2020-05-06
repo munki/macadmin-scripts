@@ -592,6 +592,14 @@ def main():
     parser.add_argument('--current', action='store_true',
                         help='Automatically select the current installed '
                         'build.')
+    parser.add_argument('--renew', action='store_true',
+                        help='Automatically select the appropriate valid build '
+                        'for the current device, limited to versions newer '
+                        'than the current installed build.')
+    parser.add_argument('--newer_than_version', metavar='newer_than_version',
+                        default='',
+                        help='Specify a minimum version to check for newer '
+                        'versions to download.')
     parser.add_argument('--validate', action='store_true',
                         help='Validate builds for board ID and hardware model '
                         'and only show appropriate builds.')
@@ -698,7 +706,7 @@ def main():
         if args.version and args.version != product_info[product_id]['version']:
             continue
 
-        # skip if a version is selected and it does not match
+        # skip if an OS is selected and it does not match
         if args.os:
             major = product_info[product_id]['version'].split('.', 2)[:2]
             os_version = '.'.join(major)
@@ -706,19 +714,43 @@ def main():
                 continue
 
         # determine the latest valid build ID and select this
-        # when using auto and version options
+        # when using auto, os and version options
         if (args.auto or args.version or args.os):
             if (args.beta or 'Beta' not in product_info[product_id]['title']):
                 try:
                     latest_valid_build
                 except NameError:
                     latest_valid_build = product_info[product_id]['BUILD']
+                    # if using newer-than option, skip if not newer than the version
+                    # we are checking against
+                    if args.newer_than_version:
+                        latest_valid_build = get_latest_version(
+                            product_info[product_id]['version'],
+                            args.newer_than_version) 
+                        if latest_valid_build == args.newer_than_version:
+                            continue
+                    # if using renew option, skip if the same as the current version
+                    if (args.renew and
+                            build_info[0] == product_info[product_id]['version']):
+                        continue
                     answer = index+1
                 else:
                     latest_valid_build = get_latest_version(
                                             product_info[product_id]['BUILD'],
                                             latest_valid_build)
                     if latest_valid_build == product_info[product_id]['BUILD']:
+                        # if using newer-than option, skip if not newer than the version
+                        # we are checking against
+                        if args.newer_than_version:
+                            latest_valid_build = get_latest_version(
+                                product_info[product_id]['version'],
+                                args.newer_than_version)
+                            if latest_valid_build == args.newer_than_version:
+                                continue
+                        # if using renew option, skip if the same as the current version
+                        if (args.renew and
+                            build_info[1] == product_info[product_id]['BUILD']):
+                            continue
                         answer = index+1
 
         # Write this build info to plist
@@ -738,7 +770,7 @@ def main():
 
         elif args.current:
             # automatically select matching build ID if current option used
-            if build_info[0] == product_info[product_id]['BUILD']:
+            if build_info[0] == product_info[product_id]['version']:
                 answer = index+1
                 break
 
@@ -782,6 +814,32 @@ def main():
             print('\n'
                   'Build %s available. Downloading #%s...\n'
                   % (build_info[0], answer))
+    elif args.newer_than_version:
+        try:
+            answer
+        except NameError:
+            print('\n'
+                  'No newer valid version than the specified version available. '
+                  'Run again without --newer_than_version argument '
+                  'to select a valid build to download.\n')
+            exit(0)
+        else:
+            print('\n'
+                  'Build %s selected. Downloading #%s...\n'
+                  % (latest_valid_build, answer))
+    elif args.renew:
+        try:
+            answer
+        except NameError:
+            print('\n'
+                  'No newer valid version than the current system version available. '
+                  'Run again without --renew argument '
+                  'to select a valid build to download.\n')
+            exit(0)
+        else:
+            print('\n'
+                  'Build %s selected. Downloading #%s...\n'
+                  % (latest_valid_build, answer))
     elif args.version:
         try:
             answer
