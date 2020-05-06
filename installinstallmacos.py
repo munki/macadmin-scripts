@@ -69,11 +69,12 @@ def get_board_id():
     try:
         ioreg_output = subprocess.check_output(ioreg_cmd).splitlines()
         for line in ioreg_output:
-            if 'board-id' in line:
-                board_id = line.split("<")[-1]
+            line_decoded = line.decode('utf8')
+            if 'board-id' in line_decoded:
+                board_id = line_decoded.split("<")[-1]
                 board_id = board_id[board_id.find('<"')+2:board_id.find('">')]
                 return board_id
-    except subprocess.CalledProcessError, err:
+    except subprocess.CalledProcessError as err:
         raise ReplicationError(err)
 
 
@@ -82,12 +83,12 @@ def is_a_vm():
     sysctl_cmd = ['/usr/sbin/sysctl', 'machdep.cpu.features']
     try:
         sysctl_output = subprocess.check_output(sysctl_cmd)
-        cpu_features = sysctl_output.split(" ")
+        cpu_features = sysctl_output.decode('utf8').split(" ")
         is_vm = False
         for i in range(len(cpu_features)):
             if cpu_features[i] == "VMM":
                 is_vm = True
-    except subprocess.CalledProcessError, err:
+    except subprocess.CalledProcessError as err:
         raise ReplicationError(err)
     return is_vm
 
@@ -97,8 +98,8 @@ def get_hw_model():
     sysctl_cmd = ['/usr/sbin/sysctl', 'hw.model']
     try:
         sysctl_output = subprocess.check_output(sysctl_cmd)
-        hw_model = sysctl_output.split(" ")[-1].split("\n")[0]
-    except subprocess.CalledProcessError, err:
+        hw_model = sysctl_output.decode('utf8').split(" ")[-1].split("\n")[0]
+    except subprocess.CalledProcessError as err:
         raise ReplicationError(err)
     return hw_model
 
@@ -110,11 +111,12 @@ def get_current_build_info():
     try:
         sw_vers_output = subprocess.check_output(sw_vers_cmd).splitlines()
         for line in sw_vers_output:
-            if 'ProductVersion' in line:
-                build_info.insert(0, line.split("\t")[-1])
-            if 'BuildVersion' in line:
-                build_info.insert(1, line.split("\t")[-1])
-    except subprocess.CalledProcessError, err:
+            line_decoded = line.decode('utf8')
+            if 'ProductVersion' in line_decoded:
+                build_info.insert(0, line_decoded.split("\t")[-1])
+            if 'BuildVersion' in line_decoded:
+                build_info.insert(1, line_decoded.split("\t")[-1])
+    except subprocess.CalledProcessError as err:
         raise ReplicationError(err)
     return build_info
 
@@ -145,6 +147,16 @@ def read_plist_from_string(bytestring):
     except AttributeError:
         # plistlib module doesn't have a load function (as in Python 2)
         return plistlib.readPlistFromString(bytestring)
+
+
+def write_plist(plist_object, filepath):
+    '''Wrapper for the differences between Python 2 and Python 3's plistlib'''
+    try:
+        with open(filepath, "wb") as fileobj:
+            return plistlib.dump(plist_object, fileobj)
+    except AttributeError:
+        # plistlib module doesn't have a load function (as in Python 2)
+        return plistlib.writePlist(plist_object, filepath)
 
 
 def get_seeding_program(sucatalog_url):
@@ -781,7 +793,7 @@ def main():
 
     # Output a plist of available updates and quit if list option chosen
     if args.list:
-        plistlib.writePlist(pl, output_plist)
+        write_plist(pl, output_plist)
         print('\n'
                'Valid seeding programs are: %s'
                % ', '.join(get_seeding_programs()))
