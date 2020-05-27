@@ -128,7 +128,7 @@ def get_default_catalog():
 
 def make_sparse_image(volume_name, output_path):
     '''Make a sparse disk image we can install a product to'''
-    cmd = ['/usr/bin/hdiutil', 'create', '-size', '9g', '-fs', 'HFS+',
+    cmd = ['/usr/bin/hdiutil', 'create', '-size', '16g', '-fs', 'HFS+',
            '-volname', volume_name, '-type', 'SPARSE', '-plist', output_path]
     try:
         output = subprocess.check_output(cmd)
