@@ -98,7 +98,8 @@ def get_seeding_program(sucatalog_url):
             if sucatalog_url == value:
                 return key
         return ''
-    except (OSError, ExpatError, AttributeError, KeyError):
+    except (OSError, IOError, ExpatError, AttributeError, KeyError) as err:
+        print(err, file=sys.stderr)
         return ''
 
 
@@ -107,7 +108,8 @@ def get_seed_catalog(seedname='DeveloperSeed'):
     try:
         seed_catalogs = read_plist(SEED_CATALOGS_PLIST)
         return seed_catalogs.get(seedname)
-    except (OSError, ExpatError, AttributeError, KeyError):
+    except (OSError, IOError, ExpatError, AttributeError, KeyError) as err:
+        print(err, file=sys.stderr)
         return ''
 
 
@@ -116,7 +118,8 @@ def get_seeding_programs():
     try:
         seed_catalogs = read_plist(SEED_CATALOGS_PLIST)
         return list(seed_catalogs.keys())
-    except (OSError, ExpatError, AttributeError, KeyError):
+    except (OSError, IOError, ExpatError, AttributeError, KeyError) as err:
+        print(err, file=sys.stderr)
         return ''
 
 
