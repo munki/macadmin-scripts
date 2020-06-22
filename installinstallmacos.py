@@ -312,7 +312,7 @@ def get_server_metadata(catalog, product_key, workdir, ignore_cache=False):
             print('Could not replicate %s: %s' % (url, err), file=sys.stderr)
             return None
     except KeyError:
-        print('Malformed catalog.', file=sys.stderr)
+        #print('Malformed catalog.', file=sys.stderr)
         return None
 
 
@@ -328,6 +328,10 @@ def parse_dist(filename):
     except IOError as err:
         print('Error reading %s: %s' % (filename, err), file=sys.stderr)
         return dist_info
+
+    titles = dom.getElementsByTagName('title')
+    if titles:
+        dist_info['title_from_dist'] = titles[0].firstChild.wholeText
 
     auxinfos = dom.getElementsByTagName('auxinfo')
     if not auxinfos:
@@ -392,8 +396,7 @@ def find_mac_os_installers(catalog):
             product = catalog['Products'][product_key]
             try:
                 if product['ExtendedMetaInfo'][
-                        'InstallAssistantPackageIdentifiers'][
-                            'OSInstall'] == 'com.apple.mpkg.OSInstall':
+                        'InstallAssistantPackageIdentifiers']:
                     mac_os_installer_products.append(product_key)
             except KeyError:
                 continue
@@ -409,21 +412,30 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
         filename = get_server_metadata(catalog, product_key, workdir)
         if filename:
             product_info[product_key] = parse_server_metadata(filename)
-            product = catalog['Products'][product_key]
-            product_info[product_key]['PostDate'] = product['PostDate']
-            distributions = product['Distributions']
-            dist_url = distributions.get('English') or distributions.get('en')
-            try:
-                dist_path = replicate_url(
-                    dist_url, root_dir=workdir, ignore_cache=ignore_cache)
-            except ReplicationError as err:
-                print('Could not replicate %s: %s' % (dist_url, err),
-                      file=sys.stderr)
-            else:
-                dist_info = parse_dist(dist_path)
-                product_info[product_key]['DistributionPath'] = dist_path
-                product_info[product_key].update(dist_info)
+        else:
+            print('No server metadata for %s' % product_key)
+            product_info[product_key]['title'] = None
+            product_info[product_key]['version'] = None
 
+        product = catalog['Products'][product_key]
+        product_info[product_key]['PostDate'] = product['PostDate']
+        distributions = product['Distributions']
+        dist_url = distributions.get('English') or distributions.get('en')
+        try:
+            dist_path = replicate_url(
+                dist_url, root_dir=workdir, ignore_cache=ignore_cache)
+        except ReplicationError as err:
+            print('Could not replicate %s: %s' % (dist_url, err),
+                  file=sys.stderr)
+        else:
+            dist_info = parse_dist(dist_path)
+            product_info[product_key]['DistributionPath'] = dist_path
+            product_info[product_key].update(dist_info)
+            if not product_info[product_key]['title']:
+                product_info[product_key]['title'] = dist_info.get('title_from_dist')
+            if not product_info[product_key]['version']:
+                product_info[product_key]['version'] = dist_info.get('VERSION')
+        
     return product_info
 
 
@@ -523,14 +535,14 @@ def main():
         exit(-1)
 
     # display a menu of choices (some seed catalogs have multiple installers)
-    print('%2s %12s %10s %8s %11s  %s'
+    print('%2s %14s %10s %8s %11s  %s'
           % ('#', 'ProductID', 'Version', 'Build', 'Post Date', 'Title'))
     for index, product_id in enumerate(product_info):
-        print('%2s %12s %10s %8s %11s  %s' % (
+        print('%2s %14s %10s %8s %11s  %s' % (
             index + 1,
             product_id,
-            product_info[product_id]['version'],
-            product_info[product_id]['BUILD'],
+            product_info[product_id].get('version', 'UNKNOWN'),
+            product_info[product_id].get('BUILD', 'UNKNOWN'),
             product_info[product_id]['PostDate'].strftime('%Y-%m-%d'),
             product_info[product_id]['title']
         ))
