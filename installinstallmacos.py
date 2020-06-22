@@ -391,9 +391,7 @@ def find_mac_os_installers(catalog):
         for product_key in catalog['Products'].keys():
             product = catalog['Products'][product_key]
             try:
-                if product['ExtendedMetaInfo'][
-                        'InstallAssistantPackageIdentifiers'][
-                            'OSInstall'] == 'com.apple.mpkg.OSInstall':
+                if product['ExtendedMetaInfo']['InstallAssistantPackageIdentifiers']['SharedSupport'] == 'com.apple.pkg.InstallAssistant.Seed.macOS1016Seed1':
                     mac_os_installer_products.append(product_key)
             except KeyError:
                 continue
@@ -407,8 +405,12 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
     for product_key in installer_products:
         product_info[product_key] = {}
         filename = get_server_metadata(catalog, product_key, workdir)
-        if filename:
-            product_info[product_key] = parse_server_metadata(filename)
+        if not filename:
+            # product_info[product_key] = parse_server_metadata(filename)
+            metadata = {}
+            metadata['title'] = 'macOS Big Sur'
+            metadata['version'] = '10.16'
+            product_info[product_key] = metadata
             product = catalog['Products'][product_key]
             product_info[product_key]['PostDate'] = product['PostDate']
             distributions = product['Distributions']
