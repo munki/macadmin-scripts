@@ -30,6 +30,7 @@ import argparse
 import gzip
 import os
 import plistlib
+import shutil
 import subprocess
 import sys
 import xattr
@@ -650,6 +651,11 @@ def main():
         "directory.",
     )
     parser.add_argument(
+        "--clear",
+        action="store_true",
+        help="Clear the working directory to ensure a new download.",
+    )
+    parser.add_argument(
         "--compress",
         action="store_true",
         help="Output a read-only compressed disk image with "
@@ -916,14 +922,22 @@ def main():
         and not args.build
         and not args.current
         and not args.validate
+        and not args.list
     ):
         print("No valid build found for this hardware")
         exit(0)
 
+    # clear content directory in workdir if requested
+    if args.clear:
+        print(
+            "Removing existing content from working directory '%s'...\n" % args.workdir
+        )
+        shutil.rmtree("%s/content" % args.workdir)
+
     # Output a plist of available updates and quit if list option chosen
     if args.list:
         write_plist(pl, output_plist)
-        print("\n" "Valid seeding programs are: %s" % ", ".join(get_seeding_programs()))
+        print("Valid seeding programs are: %s" % ", ".join(get_seeding_programs()))
         exit(0)
 
     # check for validity of specified build if argument supplied
