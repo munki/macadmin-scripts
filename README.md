@@ -28,7 +28,9 @@ Command '['/usr/sbin/installer', '-pkg', './content/downloads/07/20/091-95774/aw
 Product installation failed.
 ```
 
-Use a compatible Mac or select a different build compatible with your current hardware and try again. You may also have success running the script in a VM; the InstallationCheck script in versions of the macOS installer to date skips the checks (and returns success) when run on a VM.
+Use a compatible Mac or select a different build compatible with your current hardware and try again. You may also have success running the script in a VM; the InstallationCheck script in versions of the macOS installer to date skips the checks (and returns success) when run on a VM. 
+
+Catalina privacy protections might interfere with the operation of this tool if you run it from ~/Desktop, ~/Documents, ~/Downloads or other directories protected in Catalina. Consider using /Users/Shared (or subdirectory) as the "working space" for this tool.
 
 Graham Pugh has a fork with a lot more features and bells and whistles. Check it out if your needs aren't met by this tool. https://github.com/grahampugh/macadmin-scripts
 
