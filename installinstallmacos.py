@@ -537,7 +537,7 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
         if filename:
             product_info[product_key] = parse_server_metadata(filename)
         else:
-            print("No server metadata for %s" % product_key)
+            print("WARNING: No server metadata for %s\n" % product_key)
             product_info[product_key]["title"] = None
             product_info[product_key]["version"] = None
 
@@ -788,7 +788,6 @@ def main():
     product_info = os_installer_product_info(
         catalog, args.workdir, ignore_cache=args.ignore_cache
     )
-
     if not product_info:
         print("No macOS installer products found in the sucatalog.", file=sys.stderr)
         exit(-1)
@@ -806,11 +805,20 @@ def main():
     )
     for index, product_id in enumerate(product_info):
         not_valid = ""
-        if hw_model in product_info[product_id]["UnsupportedModels"] and is_vm == False:
-            not_valid = "Unsupported Model Identifier"
-        elif board_id not in product_info[product_id]["BoardIDs"] and is_vm == False:
-            not_valid = "Unsupported Board ID"
-        elif (
+        if not product_info[product_id]["UnsupportedModels"]:
+            not_valid = "WARNING: No unsupported model data"
+        else:
+            if (
+                hw_model in product_info[product_id]["UnsupportedModels"]
+                and is_vm == False
+            ):
+                not_valid = "Unsupported Model Identifier"
+        if not product_info[product_id]["BoardIDs"]:
+            not_valid = "WARNING: No supported Board ID data"
+        else:
+            if board_id not in product_info[product_id]["BoardIDs"] and is_vm == False:
+                not_valid = "Unsupported Board ID"
+        if (
             get_latest_version(build_info[0], product_info[product_id]["version"])
             != product_info[product_id]["version"]
         ):
