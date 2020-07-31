@@ -527,7 +527,7 @@ def find_mac_os_installers(catalog):
     return mac_os_installer_products
 
 
-def os_installer_product_info(catalog, workdir, ignore_cache=False):
+def os_installer_product_info(catalog, workdir, warnings, ignore_cache=False):
     """Returns a dict of info about products that look like macOS installers"""
     product_info = {}
     installer_products = find_mac_os_installers(catalog)
@@ -537,7 +537,8 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
         if filename:
             product_info[product_key] = parse_server_metadata(filename)
         else:
-            print("WARNING: No server metadata for %s\n" % product_key)
+            if warnings:
+                print("WARNING: No server metadata for %s\n" % product_key)
             product_info[product_key]["title"] = None
             product_info[product_key]["version"] = None
 
@@ -717,6 +718,9 @@ def main():
         "for the current device.",
     )
     parser.add_argument(
+        "--warnings", action="store_true", help="Show warnings in the listed output",
+    )
+    parser.add_argument(
         "--beta",
         action="store_true",
         help="Include beta versions in the selection "
@@ -786,7 +790,7 @@ def main():
         su_catalog_url, args.workdir, ignore_cache=args.ignore_cache
     )
     product_info = os_installer_product_info(
-        catalog, args.workdir, ignore_cache=args.ignore_cache
+        catalog, args.workdir, args.warnings, ignore_cache=args.ignore_cache
     )
     if not product_info:
         print("No macOS installer products found in the sucatalog.", file=sys.stderr)
@@ -799,25 +803,37 @@ def main():
     valid_build_found = False
 
     # display a menu of choices (some seed catalogs have multiple installers)
+    validity_header = ""
+    if args.warnings:
+        validity_header = "Notes/Warnings"
     print(
         "%2s  %-15s %-10s %-8s %-11s %-30s %s"
-        % ("#", "ProductID", "Version", "Build", "Post Date", "Title", "Notes")
+        % ("#", "ProductID", "Version", "Build", "Post Date", "Title", validity_header)
     )
     for index, product_id in enumerate(product_info):
         not_valid = ""
-        if not product_info[product_id]["UnsupportedModels"]:
-            not_valid += "WARNING: No unsupported model data "
+        if (
+            not product_info[product_id]["UnsupportedModels"]
+            and not product_info[product_id]["BoardIDs"]
+        ):
+            not_valid = "No unsupported Model or supported Board ID data"
         else:
-            if (
-                hw_model in product_info[product_id]["UnsupportedModels"]
-                and is_vm == False
-            ):
-                not_valid = "Unsupported Model Identifier"
-        if not product_info[product_id]["BoardIDs"]:
-            not_valid += "WARNING: No supported Board ID data "
-        else:
-            if board_id not in product_info[product_id]["BoardIDs"] and is_vm == False:
-                not_valid = "Unsupported Board ID"
+            if not product_info[product_id]["UnsupportedModels"]:
+                not_valid = "No unsupported model data "
+            else:
+                if (
+                    hw_model in product_info[product_id]["UnsupportedModels"]
+                    and is_vm == False
+                ):
+                    not_valid = "Unsupported Model Identifier"
+            if not product_info[product_id]["BoardIDs"]:
+                not_valid += "No supported Board ID data "
+            else:
+                if (
+                    board_id not in product_info[product_id]["BoardIDs"]
+                    and is_vm == False
+                ):
+                    not_valid = "Unsupported Board ID"
         if (
             get_latest_version(build_info[0], product_info[product_id]["version"])
             != product_info[product_id]["version"]
@@ -825,6 +841,9 @@ def main():
             not_valid = "Unsupported macOS version"
         else:
             valid_build_found = True
+        validity_info = ""
+        if args.warnings:
+            validity_info = not_valid
 
         print(
             "%2s  %-15s %-10s %-8s %-11s %-30s %s"
@@ -835,7 +854,7 @@ def main():
                 product_info[product_id].get("BUILD", "UNKNOWN"),
                 product_info[product_id]["PostDate"].strftime("%Y-%m-%d"),
                 product_info[product_id]["title"],
-                not_valid,
+                validity_info,
             )
         )
 
@@ -945,7 +964,7 @@ def main():
     # Output a plist of available updates and quit if list option chosen
     if args.list:
         write_plist(pl, output_plist)
-        print("Valid seeding programs are: %s" % ", ".join(get_seeding_programs()))
+        print("\nValid seeding programs are: %s\n" % ", ".join(get_seeding_programs()))
         exit(0)
 
     # check for validity of specified build if argument supplied
