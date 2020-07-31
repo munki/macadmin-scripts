@@ -147,7 +147,7 @@ def read_plist_from_string(bytestring):
         return plistlib.loads(bytestring)
     except AttributeError:
         # plistlib module doesn't have a load function (as in Python 2)
-        return plistlib.readPlistFromString(bytestring)
+        return plistlib.readPlistFromString(bytestring)  # pylint: disable=no-member
 
 
 def write_plist(plist_object, filepath):
@@ -806,7 +806,7 @@ def main():
     for index, product_id in enumerate(product_info):
         not_valid = ""
         if not product_info[product_id]["UnsupportedModels"]:
-            not_valid = "WARNING: No unsupported model data"
+            not_valid += "WARNING: No unsupported model data "
         else:
             if (
                 hw_model in product_info[product_id]["UnsupportedModels"]
@@ -814,7 +814,7 @@ def main():
             ):
                 not_valid = "Unsupported Model Identifier"
         if not product_info[product_id]["BoardIDs"]:
-            not_valid = "WARNING: No supported Board ID data"
+            not_valid += "WARNING: No supported Board ID data "
         else:
             if board_id not in product_info[product_id]["BoardIDs"] and is_vm == False:
                 not_valid = "Unsupported Board ID"
