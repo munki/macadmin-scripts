@@ -862,7 +862,9 @@ def main():
 
         # skip if build is not suitable for current device
         # and a validation parameter was chosen
-        if not_valid and (args.validate or args.auto or args.version or args.os):
+        if not_valid and (
+            args.validate or (args.auto or args.version or args.os) and not args.beta
+        ):
             continue
 
         # skip if a version is selected and it does not match
