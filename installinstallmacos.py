@@ -1040,7 +1040,7 @@ def main():
         except NameError:
             print(
                 "\n"
-                "Item # %s is not available. "
+                "Version %s is not available. "
                 "Run again without --version argument "
                 "to select a valid build to download.\n" % args.version
             )
@@ -1056,7 +1056,7 @@ def main():
         except NameError:
             print(
                 "\n"
-                "Item # %s is not available. "
+                "OS %s is not available. "
                 "Run again without --os argument "
                 "to select a valid build to download.\n" % args.os
             )
