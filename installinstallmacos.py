@@ -112,7 +112,7 @@ def get_bridge_id():
         remotectl_output = subprocess.check_output(remotectl_cmd)
         bridge_id = remotectl_output.decode("utf8").split(" ")[-1].split("\n")[0]
     except subprocess.CalledProcessError as err:
-        raise ReplicationError(err)
+        return None
     return bridge_id
 
 
