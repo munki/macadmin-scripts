@@ -105,6 +105,17 @@ def get_hw_model():
     return hw_model
 
 
+def get_bridge_id():
+    """Gets the local system DeviceID for T2 Macs"""
+    remotectl_cmd = ["/usr/libexec/remotectl", "get-property", "localbridge", "HWModel"]
+    try:
+        remotectl_output = subprocess.check_output(remotectl_cmd)
+        bridge_id = remotectl_output.decode("utf8").split(" ")[-1].split("\n")[0]
+    except subprocess.CalledProcessError as err:
+        raise ReplicationError(err)
+    return bridge_id
+
+
 def get_current_build_info():
     """Gets the local system build"""
     build_info = []
@@ -412,7 +423,7 @@ def get_server_metadata(catalog, product_key, workdir, ignore_cache=False):
             print("Could not replicate %s: %s" % (url, err), file=sys.stderr)
             return None
     except KeyError:
-        # print('Malformed catalog.', file=sys.stderr)
+        # print("No metadata for %s.\n" % product_key, file=sys.stderr)
         return None
 
 
@@ -468,20 +479,36 @@ def get_board_ids(filename):
     with open(filename) as search:
         for line in search:
             line = line.rstrip()  # remove '\n' at end of line
+            # dist files for macOS 10.* list boardIDs whereas dist files for
+            # macOS 11.* list supportedBoardIDs
             if "boardIds" in line:
-                supported_board_ids = line.split(" ")[-1][:-1]
+                supported_board_ids = line.lstrip("var boardIDs = ")
+            elif "supportedBoardIDs" in line:
+                supported_board_ids = line.lstrip("var supportedBoardIDs = ")
                 return supported_board_ids
+
+
+def get_device_ids(filename):
+    """Parses a softwareupdate dist file, returning a list of supported
+    Device IDs. These are used for identifying T2 chips in the dist files of macOS 11.* - not checked in older builds"""
+    supported_device_ids = ""
+    with open(filename) as search:
+        for line in search:
+            line = line.rstrip()  # remove '\n' at end of line
+            if "supportedDeviceIDs" in line:
+                supported_device_ids = line.lstrip("var supportedDeviceIDs = ")
+                return supported_device_ids
 
 
 def get_unsupported_models(filename):
     """Parses a softwareupdate dist file, returning a list of non-supported
-    ModelIdentifiers"""
+    ModelIdentifiers. This is not used in macOS 11.*"""
     unsupported_models = ""
     with open(filename) as search:
         for line in search:
             line = line.rstrip()  # remove '\n' at end of line
             if "nonSupportedModels" in line:
-                unsupported_models = line.split(" ")[-1][:-1]
+                unsupported_models = line.lstrip("var nonSupportedModels = ")
                 return unsupported_models
 
 
@@ -527,18 +554,19 @@ def find_mac_os_installers(catalog):
     return mac_os_installer_products
 
 
-def os_installer_product_info(catalog, workdir, warnings, ignore_cache=False):
+def os_installer_product_info(catalog, workdir, ignore_cache=False):
     """Returns a dict of info about products that look like macOS installers"""
     product_info = {}
     installer_products = find_mac_os_installers(catalog)
     for product_key in installer_products:
         product_info[product_key] = {}
+        # get the localized title (e.g. "macOS Catalina Beta") and version
+        # from ServerMetadataURL for macOS 10.*
+        # For macOS 11.* we get these directly from the dist file
         filename = get_server_metadata(catalog, product_key, workdir)
         if filename:
             product_info[product_key] = parse_server_metadata(filename)
         else:
-            if warnings:
-                print("WARNING: No server metadata for %s\n" % product_key)
             product_info[product_key]["title"] = None
             product_info[product_key]["version"] = None
 
@@ -559,6 +587,8 @@ def os_installer_product_info(catalog, workdir, warnings, ignore_cache=False):
             product_info[product_key]["UnsupportedModels"] = unsupported_models
             board_ids = get_board_ids(dist_path)
             product_info[product_key]["BoardIDs"] = board_ids
+            device_ids = get_device_ids(dist_path)
+            product_info[product_key]["DeviceIDs"] = device_ids
             product_info[product_key].update(dist_info)
             if not product_info[product_key]["title"]:
                 product_info[product_key]["title"] = dist_info.get("title_from_dist")
@@ -745,6 +775,7 @@ def main():
     # show this Mac's info
     hw_model = get_hw_model()
     board_id = get_board_id()
+    bridge_id = get_bridge_id()
     build_info = get_current_build_info()
     is_vm = is_a_vm()
 
@@ -752,6 +783,7 @@ def main():
     if is_vm == True:
         print("Identified as a Virtual Machine")
     print("%-17s: %s" % ("Model Identifier", hw_model))
+    print("%-17s: %s" % ("Bridge ID", bridge_id))
     print("%-17s: %s" % ("Board ID", board_id))
     print("%-17s: %s" % ("OS Version", build_info[0]))
     print("%-17s: %s\n" % ("Build ID", build_info[1]))
@@ -790,7 +822,7 @@ def main():
         su_catalog_url, args.workdir, ignore_cache=args.ignore_cache
     )
     product_info = os_installer_product_info(
-        catalog, args.workdir, args.warnings, ignore_cache=args.ignore_cache
+        catalog, args.workdir, ignore_cache=args.ignore_cache
     )
     if not product_info:
         print("No macOS installer products found in the sucatalog.", file=sys.stderr)
@@ -810,30 +842,25 @@ def main():
         "%2s  %-15s %-10s %-8s %-11s %-30s %s"
         % ("#", "ProductID", "Version", "Build", "Post Date", "Title", validity_header)
     )
+    # this is where we do checks for validity based on model type and version
     for index, product_id in enumerate(product_info):
         not_valid = ""
-        if (
-            not product_info[product_id]["UnsupportedModels"]
-            and not product_info[product_id]["BoardIDs"]
-        ):
-            not_valid = "No unsupported Model or supported Board ID data"
-        else:
-            if not product_info[product_id]["UnsupportedModels"]:
-                not_valid = "No unsupported model data "
-            else:
-                if (
-                    hw_model in product_info[product_id]["UnsupportedModels"]
-                    and is_vm == False
-                ):
-                    not_valid = "Unsupported Model Identifier"
-            if not product_info[product_id]["BoardIDs"]:
-                not_valid += "No supported Board ID data "
-            else:
-                if (
-                    board_id not in product_info[product_id]["BoardIDs"]
-                    and is_vm == False
-                ):
+        if is_vm == False:
+            # first look for a BoardID (not present in modern hardware)
+            if board_id and product_info[product_id]["BoardIDs"]:
+                if board_id not in product_info[product_id]["BoardIDs"]:
                     not_valid = "Unsupported Board ID"
+            # if there's no Board ID there has to be a BridgeID:
+            elif bridge_id and product_info[product_id]["DeviceIDs"]:
+                if bridge_id not in product_info[product_id]["DeviceIDs"]:
+                    not_valid = "Unsupported Bridge ID"
+            # finally we fall back on ModelIdentifiers for T1 and older
+            elif hw_model and product_info[product_id]["UnsupportedModels"]:
+                if hw_model in product_info[product_id]["UnsupportedModels"]:
+                    not_valid = "Unsupported Model Identifier"
+            # if we don't have any of those matches, then we can't do a comparison
+            else:
+                not_valid = "No supported model data"
         if (
             get_latest_version(build_info[0], product_info[product_id]["version"])
             != product_info[product_id]["version"]
@@ -841,6 +868,7 @@ def main():
             not_valid = "Unsupported macOS version"
         else:
             valid_build_found = True
+
         validity_info = ""
         if args.warnings:
             validity_info = not_valid
@@ -863,7 +891,9 @@ def main():
         # skip if build is not suitable for current device
         # and a validation parameter was chosen
         if not_valid and (
-            args.validate or (args.auto or args.version or args.os) and not args.beta
+            args.validate
+            or (args.auto or args.version or args.os)
+            # and not args.beta  # not needed now we have DeviceID check
         ):
             continue
 
@@ -1131,7 +1161,7 @@ def main():
                     "Adding seeding program %s extended attribute to app"
                     % seeding_program
                 )
-                xattr.setxattr(installer_app, "SeedProgram", seeding_program)
+                xattr.setxattr(installer_app, "SeedProgram", seeding_program.encode())
         print("Product downloaded and installed to %s" % sparse_diskimage_path)
         if args.raw:
             unmountdmg(mountpoint)
