@@ -107,7 +107,13 @@ def get_hw_model():
 
 def get_bridge_id():
     """Gets the local system DeviceID for T2 Macs"""
-    remotectl_cmd = ["/usr/libexec/remotectl", "get-property", "localbridge", "HWModel"]
+    remotectl_cmd = [
+        "/usr/libexec/remotectl",
+        "get-property",
+        "localbridge",
+        "HWModel",
+        "2>/dev/null",
+    ]
     try:
         remotectl_output = subprocess.check_output(remotectl_cmd)
         bridge_id = remotectl_output.decode("utf8").split(" ")[-1].split("\n")[0]
