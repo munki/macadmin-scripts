@@ -502,7 +502,7 @@ def get_device_ids(filename):
     supported_device_ids = ""
     with open(filename) as search:
         for line in search:
-            line = line.rstrip()  # remove '\n' at end of line
+            line = line.decode("utf8").rstrip()  # remove '\n' at end of line
             if "supportedDeviceIDs" in line:
                 supported_device_ids = line.lstrip("var supportedDeviceIDs = ")
                 return supported_device_ids
@@ -514,7 +514,7 @@ def get_unsupported_models(filename):
     unsupported_models = ""
     with open(filename) as search:
         for line in search:
-            line = line.rstrip()  # remove '\n' at end of line
+            line = line.decode("utf8").rstrip()  # remove '\n' at end of line
             if "nonSupportedModels" in line:
                 unsupported_models = line.lstrip("var nonSupportedModels = ")
                 return unsupported_models
