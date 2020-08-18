@@ -81,7 +81,7 @@ def get_board_id():
 
 def is_a_vm():
     """Determines if the script is being run in a virtual machine"""
-    sysctl_cmd = ["/usr/sbin/sysctl", "machdep.cpu.features"]
+    sysctl_cmd = ["/usr/sbin/sysctl", "-n", "machdep.cpu.features"]
     try:
         sysctl_output = subprocess.check_output(sysctl_cmd)
         cpu_features = sysctl_output.decode("utf8").split(" ")
@@ -96,26 +96,32 @@ def is_a_vm():
 
 def get_hw_model():
     """Gets the local system ModelIdentifier"""
-    sysctl_cmd = ["/usr/sbin/sysctl", "hw.model"]
+    sysctl_cmd = ["/usr/sbin/sysctl", "-n", "hw.model"]
     try:
         sysctl_output = subprocess.check_output(sysctl_cmd)
-        hw_model = sysctl_output.decode("utf8").split(" ")[-1].split("\n")[0]
+        hw_model = sysctl_output.decode("utf8")
     except subprocess.CalledProcessError as err:
         raise ReplicationError(err)
     return hw_model
 
 
 def get_bridge_id():
-    """Gets the local system DeviceID for T2 Macs"""
-    remotectl_cmd = ["/usr/libexec/remotectl", "get-property", "localbridge", "HWModel"]
-    try:
-        remotectl_output = subprocess.check_output(
-            remotectl_cmd, stderr=subprocess.STDOUT
-        )
-        bridge_id = remotectl_output.decode("utf8").split(" ")[-1].split("\n")[0]
-    except subprocess.CalledProcessError as err:
-        return None
-    return bridge_id
+    """Gets the local system DeviceID for T2 Macs - note only works on 10.13+"""
+    if os.path.exists("/usr/libexec/remotectl"):
+        remotectl_cmd = [
+            "/usr/libexec/remotectl",
+            "get-property",
+            "localbridge",
+            "HWModel",
+        ]
+        try:
+            remotectl_output = subprocess.check_output(
+                remotectl_cmd, stderr=subprocess.STDOUT
+            )
+            bridge_id = remotectl_output.decode("utf8").split(" ")[-1].split("\n")[0]
+        except subprocess.CalledProcessError as err:
+            return None
+        return bridge_id
 
 
 def get_current_build_info():
