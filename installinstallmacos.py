@@ -486,7 +486,7 @@ def get_board_ids(filename):
     supported_board_ids = ""
     with open(filename) as search:
         for line in search:
-            line = line.rstrip()  # remove '\n' at end of line
+            line = line.decode("utf8").rstrip()  # remove '\n' at end of line
             # dist files for macOS 10.* list boardIDs whereas dist files for
             # macOS 11.* list supportedBoardIDs
             if "boardIds" in line:
