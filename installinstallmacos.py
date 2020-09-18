@@ -511,8 +511,8 @@ def main():
         bad_dirs = ['Documents', 'Desktop', 'Downloads', 'Library']
         for bad_dir in bad_dirs:
             if bad_dir in current_dir:
-                sys.exit('This command cannot be run from within certain home directories, so please '
-                'run again from somewhere else, such as /Users/Shared')
+                print('Running this script from {} may not work as expected. If this does not run as expected, '
+                'please run again from somewhere else, such as /Users/Shared'.format(current_dir))
 
     if args.catalogurl:
         su_catalog_url = args.catalogurl
