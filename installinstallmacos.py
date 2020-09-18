@@ -119,7 +119,7 @@ def get_bridge_id():
                 remotectl_cmd, stderr=subprocess.STDOUT
             )
             bridge_id = remotectl_output.decode("utf8").split(" ")[-1].split("\n")[0]
-        except subprocess.CalledProcessError as err:
+        except subprocess.CalledProcessError:
             return None
         return bridge_id
 
@@ -804,13 +804,15 @@ def main():
 
     current_dir = os.getcwd()
     if os.path.expanduser("~") in current_dir:
-        bad_dirs = ['Documents', 'Desktop', 'Downloads', 'Library']
+        bad_dirs = ["Documents", "Desktop", "Downloads", "Library"]
         for bad_dir in bad_dirs:
-            if bad_dir in os.path.split(this_dir):
-                print('Running this script from %s may not work as expected. '
-                      'If this does not run as expected, please run again from '
-                      'somewhere else, such as /Users/Shared.'
-                      % current_dir, file=sys.stderr)
+            if bad_dir in os.path.split(current_dir):
+                print(
+                    "Running this script from %s may not work as expected. "
+                    "If this does not run as expected, please run again from "
+                    "somewhere else, such as /Users/Shared." % current_dir,
+                    file=sys.stderr,
+                )
 
     if args.catalogurl:
         su_catalog_url = args.catalogurl
