@@ -506,6 +506,10 @@ def main():
         sys.exit('This command requires root (to install packages), so please '
                  'run again with sudo or as root.')
 
+    if os.path.expanduser("~") in os.getcwd():
+        sys.exit('This command cannot be run from within your home directory, so please '
+        'run again from somewhere else, such as /Users/Shared')
+
     if args.catalogurl:
         su_catalog_url = args.catalogurl
     elif args.seedprogram:
