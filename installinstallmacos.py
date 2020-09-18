@@ -514,7 +514,7 @@ def main():
                 print('Running this script from %s may not work as expected. '
                     'If this does not run as expected, please run again from '
                     'somewhere else, such as /Users/Shared.'
-                % current_dir, file=sys.stderr)
+                    % current_dir, file=sys.stderr)
 
     if args.catalogurl:
         su_catalog_url = args.catalogurl
