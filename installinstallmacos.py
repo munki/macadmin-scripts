@@ -510,7 +510,7 @@ def main():
     if os.path.expanduser("~") in current_dir:
         bad_dirs = ['Documents', 'Desktop', 'Downloads', 'Library']
         for bad_dir in bad_dirs:
-            if bad_dir in os.path.split(this_dir):
+            if bad_dir in os.path.split(current_dir):
                 print('Running this script from %s may not work as expected. '
                       'If this does not run as expected, please run again from '
                       'somewhere else, such as /Users/Shared.'
