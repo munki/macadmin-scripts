@@ -506,6 +506,16 @@ def main():
         sys.exit('This command requires root (to install packages), so please '
                  'run again with sudo or as root.')
 
+    current_dir = os.getcwd()
+    if os.path.expanduser("~") in current_dir:
+        bad_dirs = ['Documents', 'Desktop', 'Downloads', 'Library']
+        for bad_dir in bad_dirs:
+            if bad_dir in os.path.split(this_dir):
+                print('Running this script from %s may not work as expected. '
+                      'If this does not run as expected, please run again from '
+                      'somewhere else, such as /Users/Shared.'
+                      % current_dir, file=sys.stderr)
+
     if args.catalogurl:
         su_catalog_url = args.catalogurl
     elif args.seedprogram:
