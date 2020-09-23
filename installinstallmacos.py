@@ -261,7 +261,9 @@ def replicate_url(full_url,
         options = '-fL'
     else:
         options = '-sfL'
-    curl_cmd = ['/usr/bin/curl', options, '--create-dirs',
+    curl_cmd = ['/usr/bin/curl', options,
+                '--create-dirs',
+                '--compressed',
                 '-o', local_file_path]
     if not ignore_cache and os.path.exists(local_file_path):
         curl_cmd.extend(['-z', local_file_path])
