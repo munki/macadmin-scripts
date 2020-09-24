@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # encoding: utf-8
 #
 # Copyright 2017 Greg Neagle.
@@ -19,13 +19,17 @@ useful to make bootable disks containing Imagr and the 'SIP-ignoring' kernel,
 which allows Imagr to run scripts that affect SIP state, set UAKEL options, and
 run the `startosinstall` component, all of which might otherwise require network
 booting from a NetInstall-style nbi.'''
+from __future__ import print_function
 
 import argparse
 import os
 import plistlib
 import subprocess
 import sys
-import urlparse
+try:
+    from urllib.parse import urlparse, unquote
+except ImportError:
+    from urlparse import urlparse, unquote
 
 
 # dmg helpers
@@ -41,8 +45,11 @@ def mountdmg(dmgpath):
     proc = subprocess.Popen(cmd, bufsize=-1,
                             stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     (pliststr, err) = proc.communicate()
+    if bytes != str:  # if Python 3, convert bytes to str
+        pliststr = pliststr.decode('utf-8')
+        err = err.decode('utf-8')
     if proc.returncode:
-        print >> sys.stderr, 'Error: "%s" while mounting %s.' % (err, dmgname)
+        print('Error: "%s" while mounting %s.' % (err, dmgname), file=sys.stderr)
         return None
     if pliststr:
         plist = plistlib.readPlistFromString(pliststr)
@@ -60,15 +67,17 @@ def unmountdmg(mountpoint):
     proc = subprocess.Popen(['/usr/bin/hdiutil', 'detach', mountpoint],
                             bufsize=-1, stdout=subprocess.PIPE,
                             stderr=subprocess.PIPE)
-    (dummy_output, err) = proc.communicate()
+    (_, err) = proc.communicate()
+    if bytes != str:  # if Python 3, convert bytes to str
+        err = err.decode('utf-8')
     if proc.returncode:
-        print >> sys.stderr, 'Polite unmount failed: %s' % err
-        print >> sys.stderr, 'Attempting to force unmount %s' % mountpoint
+        print('Polite unmount failed: %s' % err, file=sys.stderr)
+        print('Attempting to force unmount %s' % mountpoint, file=sys.stderr)
         # try forcing the unmount
         retcode = subprocess.call(['/usr/bin/hdiutil', 'detach', mountpoint,
                                    '-force'])
         if retcode:
-            print >> sys.stderr, 'Failed to unmount %s' % mountpoint
+            print('Failed to unmount %s' % mountpoint, file=sys.stderr)
 
 
 def locate_basesystem_dmg(nbi):
@@ -77,19 +86,19 @@ def locate_basesystem_dmg(nbi):
     source_boot_plist = os.path.join(nbi, 'i386/com.apple.Boot.plist')
     try:
         boot_args = plistlib.readPlist(source_boot_plist)
-    except Exception, err:
-        print >> sys.stderr, err
+    except Exception as err:
+        print(err, file=sys.stderr)
         sys.exit(-1)
     kernel_flags = boot_args.get('Kernel Flags')
     if not kernel_flags:
-        print >> sys.stderr, 'i386/com.apple.Boot.plist is missing Kernel Flags'
+        print('i386/com.apple.Boot.plist is missing Kernel Flags', file=sys.stderr)
         sys.exit(-1)
     # kernel flags should in the form 'root-dmg=file:///path'
     if not kernel_flags.startswith('root-dmg='):
-        print >> sys.stderr, 'Unexpected Kernel Flags: %s' % kernel_flags
+        print('Unexpected Kernel Flags: %s' % kernel_flags, file=sys.stderr)
         sys.exit(-1)
     file_url = kernel_flags[9:]
-    dmg_path = urlparse.unquote(urlparse.urlparse(file_url).path)
+    dmg_path = unquote(urlparse(file_url).path)
     # return path minus leading slash
     return dmg_path.lstrip('/')
 
@@ -99,14 +108,14 @@ def copy_system_version_plist(nbi, target_volume):
     BaseSystem.dmg to the target volume.'''
     netinstall_dmg = os.path.join(nbi, 'NetInstall.dmg')
     if not os.path.exists(netinstall_dmg):
-        print >> sys.stderr, "Missing NetInstall.dmg from nbi folder"
+        print("Missing NetInstall.dmg from nbi folder", file=sys.stderr)
         sys.exit(-1)
-    print 'Mounting %s...' % netinstall_dmg
+    print('Mounting %s...' % netinstall_dmg)
     netinstall_mount = mountdmg(netinstall_dmg)
     if not netinstall_mount:
         sys.exit(-1)
     basesystem_dmg = os.path.join(netinstall_mount, locate_basesystem_dmg(nbi))
-    print 'Mounting %s...' % basesystem_dmg
+    print('Mounting %s...' % basesystem_dmg)
     basesystem_mount = mountdmg(basesystem_dmg)
     if not basesystem_mount:
         unmountdmg(netinstall_mount)
@@ -118,8 +127,8 @@ def copy_system_version_plist(nbi, target_volume):
     try:
         subprocess.check_call(
             ['/usr/bin/ditto', '-V', source, dest])
-    except subprocess.CalledProcessError, err:
-        print >> sys.stderr, err
+    except subprocess.CalledProcessError as err:
+        print(err, file=sys.stderr)
         unmountdmg(basesystem_mount)
         unmountdmg(netinstall_mount)
         sys.exit(-1)
@@ -145,8 +154,8 @@ def copy_boot_files(nbi, target_volume):
         try:
             subprocess.check_call(
                 ['/usr/bin/ditto', '-V', full_source, full_dest])
-        except subprocess.CalledProcessError, err:
-            print >> sys.stderr, err
+        except subprocess.CalledProcessError as err:
+            print(err, file=sys.stderr)
             sys.exit(-1)
 
 
@@ -155,12 +164,12 @@ def make_boot_plist(nbi, target_volume):
     source_boot_plist = os.path.join(nbi, 'i386/com.apple.Boot.plist')
     try:
         boot_args = plistlib.readPlist(source_boot_plist)
-    except Exception, err:
-        print >> sys.stderr, err
+    except Exception as err:
+        print(err, file=sys.stderr)
         sys.exit(-1)
     kernel_flags = boot_args.get('Kernel Flags')
     if not kernel_flags:
-        print >> sys.stderr, 'i386/com.apple.Boot.plist is missing Kernel Flags'
+        print('i386/com.apple.Boot.plist is missing Kernel Flags', file=sys.stderr)
         sys.exit(-1)
     # prepend the container-dmg path
     boot_args['Kernel Flags'] = (
@@ -173,8 +182,8 @@ def make_boot_plist(nbi, target_volume):
         os.makedirs(plist_dir)
     try:
         plistlib.writePlist(boot_args, boot_plist)
-    except Exception, err:
-        print >> sys.stderr, err
+    except Exception as err:
+        print(err, file=sys.stderr)
         sys.exit(-1)
 
 
@@ -186,8 +195,8 @@ def bless(target_volume, label=None):
     try:
         subprocess.check_call(
             ['/usr/sbin/bless', '--folder', blessfolder, '--label', label])
-    except subprocess.CalledProcessError, err:
-        print >> sys.stderr, err
+    except subprocess.CalledProcessError as err:
+        print(err, file=sys.stderr)
         sys.exit(-1)
 
 
@@ -196,7 +205,7 @@ def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--nbi', required=True, metavar='path_to_nbi',
                         help='Path to nbi folder created by autonbi.')
-    parser.add_argument('--volume', required=True, 
+    parser.add_argument('--volume', required=True,
                         metavar='path_to_disk_volume',
                         help='Path to disk volume.')
     args = parser.parse_args()
