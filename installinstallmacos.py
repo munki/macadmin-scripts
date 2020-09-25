@@ -364,6 +364,15 @@ def parse_dist(filename):
     return dist_info
 
 
+def is_gz(localcatalogpath):
+    """Will return True if localcatalogpath is actually a gzip file"""
+    if os.path.splitext(localcatalogpath)[1] == ".gz":
+        with open(localcatalogpath, "rb") as file:
+            if file.read(2) == "\x1f\x8b":
+                return True
+    return False
+
+
 def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
     '''Downloads and returns a parsed softwareupdate catalog'''
     try:
@@ -372,7 +381,7 @@ def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
     except ReplicationError as err:
         print('Could not replicate %s: %s' % (sucatalog, err), file=sys.stderr)
         exit(-1)
-    if os.path.splitext(localcatalogpath)[1] == '.gz':
+    if is_gz(localcatalogpath):
         with gzip.open(localcatalogpath) as the_file:
             content = the_file.read()
             try:
