@@ -263,8 +263,11 @@ def replicate_url(full_url,
         options = '-sfL'
     curl_cmd = ['/usr/bin/curl', options,
                 '--create-dirs',
-                '--compressed',
                 '-o', local_file_path]
+    if not full_url.endswith(".gz"):
+        # stupid hack for stupid Apple behavior where it sometimes returns
+        # compressed files even when not asked for
+        curl_cmd.append('--compressed')
     if not ignore_cache and os.path.exists(local_file_path):
         curl_cmd.extend(['-z', local_file_path])
         if attempt_resume:
