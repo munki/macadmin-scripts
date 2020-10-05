@@ -43,6 +43,8 @@ If you encounter these issues:
 Graham Pugh has a fork with a lot more features and bells and whistles. Check it out if your needs aren't met by this tool.
 https://github.com/grahampugh/macadmin-scripts
 
+-----
+
 ### Legacy scripts no longer in development or supported
 
 #### createbootvolfromautonbi.py
