@@ -56,6 +56,9 @@ DEFAULT_SUCATALOGS = {
     "19": "https://swscan.apple.com/content/catalogs/others/"
     "index-10.15-10.14-10.13-10.12-10.11-10.10-10.9"
     "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog",
+    "20": "https://swscan.apple.com/content/catalogs/others/"
+    "index-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9"
+    "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog",
 }
 
 SEED_CATALOGS_PLIST = (
@@ -382,14 +385,12 @@ def replicate_url(
     if show_progress:
         options = "-fL"
     else:
-        options = '-sfL'
-    curl_cmd = ['/usr/bin/curl', options,
-                '--create-dirs',
-                '-o', local_file_path]
+        options = "-sfL"
+    curl_cmd = ["/usr/bin/curl", options, "--create-dirs", "-o", local_file_path]
     if not full_url.endswith(".gz"):
         # stupid hack for stupid Apple behavior where it sometimes returns
         # compressed files even when not asked for
-        curl_cmd.append('--compressed')
+        curl_cmd.append("--compressed")
     if not ignore_cache and os.path.exists(local_file_path):
         curl_cmd.extend(["-z", local_file_path])
         if attempt_resume:
@@ -492,7 +493,9 @@ def get_board_ids(filename):
     supported_board_ids = ""
     with open(filename) as search:
         for line in search:
-            line = line.decode("utf8").rstrip()  # remove '\n' at end of line
+            if type(line) == bytes:
+                line = line.decode("utf8")
+            line = line.rstrip()  # remove '\n' at end of line
             # dist files for macOS 10.* list boardIDs whereas dist files for
             # macOS 11.* list supportedBoardIDs
             if "boardIds" in line:
@@ -508,7 +511,9 @@ def get_device_ids(filename):
     supported_device_ids = ""
     with open(filename) as search:
         for line in search:
-            line = line.decode("utf8").rstrip()  # remove '\n' at end of line
+            if type(line) == bytes:
+                line = line.decode("utf8")
+            line = line.rstrip()  # remove '\n' at end of line
             if "supportedDeviceIDs" in line:
                 supported_device_ids = line.lstrip("var supportedDeviceIDs = ")
                 return supported_device_ids
@@ -520,7 +525,9 @@ def get_unsupported_models(filename):
     unsupported_models = ""
     with open(filename) as search:
         for line in search:
-            line = line.decode("utf8").rstrip()  # remove '\n' at end of line
+            if type(line) == bytes:
+                line = line.decode("utf8")
+            line = line.rstrip()  # remove '\n' at end of line
             if "nonSupportedModels" in line:
                 unsupported_models = line.lstrip("var nonSupportedModels = ")
                 return unsupported_models
@@ -813,10 +820,12 @@ def main():
         bad_dirs = ["Documents", "Desktop", "Downloads", "Library"]
         for bad_dir in bad_dirs:
             if bad_dir in os.path.split(current_dir):
-                print('Running this script from %s may not work as expected. '
-                      'If this does not run as expected, please run again from '
-                      'somewhere else, such as /Users/Shared.'
-                      % current_dir, file=sys.stderr)
+                print(
+                    "Running this script from %s may not work as expected. "
+                    "If this does not run as expected, please run again from "
+                    "somewhere else, such as /Users/Shared." % current_dir,
+                    file=sys.stderr,
+                )
 
     if args.catalogurl:
         su_catalog_url = args.catalogurl
