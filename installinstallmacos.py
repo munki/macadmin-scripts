@@ -605,7 +605,7 @@ def main():
             if installer_app:
                 print("Adding seeding program %s extended attribute to app"
                       % seeding_program)
-                xattr.setxattr(installer_app, 'SeedProgram', seeding_program)
+                xattr.setxattr(installer_app, 'SeedProgram', str.encode(seeding_program))
         print('Product downloaded and installed to %s' % sparse_diskimage_path)
         if args.raw:
             unmountdmg(mountpoint)
