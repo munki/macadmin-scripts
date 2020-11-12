@@ -272,9 +272,10 @@ def replicate_url(full_url,
         # compressed files even when not asked for
         curl_cmd.append('--compressed')
     if not ignore_cache and os.path.exists(local_file_path):
-        curl_cmd.extend(['-z', local_file_path])
         if attempt_resume:
             curl_cmd.extend(['-C', '-'])
+        else:
+            curl_cmd.extend(['-z', local_file_path])
     curl_cmd.append(full_url)
     print("Downloading %s..." % full_url)
     try:
