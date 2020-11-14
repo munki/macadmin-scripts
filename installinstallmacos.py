@@ -31,6 +31,7 @@ import argparse
 import gzip
 import os
 import plistlib
+import shutil
 import subprocess
 import sys
 try:
@@ -506,6 +507,9 @@ def main():
                         help='Output a read-write sparse image '
                         'with the app in the Applications directory. Requires '
                         'less available disk space and is faster.')
+    parser.add_argument('--jamf-dmg', action='store_true',
+                        help='Output a read-only compressed disk image with '
+                        'the Install macOS app in the Applications directory.')
     parser.add_argument('--ignore-cache', action='store_true',
                         help='Ignore any previously cached files.')
     args = parser.parse_args()
@@ -612,6 +616,30 @@ def main():
         print('Product downloaded and installed to %s' % sparse_diskimage_path)
         if args.raw:
             unmountdmg(mountpoint)
+        elif args.jamf_dmg:
+            # create a dmg that can be used for deployment using Jamf Pro
+            # remove all folders/files from root mount point except Applications
+            mountpoint_directories = os.listdir(mountpoint)
+            for item in mountpoint_directories:
+                item_path = mountpoint + '/' + item
+                if item != 'Applications':
+                    if os.path.isfile(item_path) or os.path.islink(item_path):
+                        print("Removing %s" % item_path)
+                        os.remove(item)  # remove the file
+                    elif os.path.isdir(item_path):
+                        print("Removing %s" % item_path)
+                        shutil.rmtree(item_path)  # remove directory
+            compressed_diskimagepath = os.path.join(
+                args.workdir, volname + '.dmg')
+            if os.path.exists(compressed_diskimagepath):
+                os.unlink(compressed_diskimagepath)
+            app_path = find_installer_app(mountpoint)
+            if app_path:
+                make_compressed_dmg(mountpoint, compressed_diskimagepath)
+            # unmount sparseimage
+            unmountdmg(mountpoint)
+            # delete sparseimage since we don't need it any longer
+            os.unlink(sparse_diskimage_path)
         else:
             # if --raw option not given, create a r/o compressed diskimage
             # containing the Install macOS app
