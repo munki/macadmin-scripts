@@ -624,12 +624,29 @@ def main():
             if os.path.exists(compressed_diskimagepath):
                 os.unlink(compressed_diskimagepath)
             app_path = find_installer_app(mountpoint)
-            # if --jamf-dmg, place parent directory containing installer app into an
-            # empty folder to create a dmg that jamf pro can deploy
             if args.jamf_dmg:
-                # determine jamf root folder name
+                # if --jamf-dmg option is given, create a jamf pro deployable dmg
+                # jamf pro supports dmg installs by mounting the dmg and copying the file
+                # structure of the dmg to the target volume.
+                # currently the --compress (default) code will generate a dmg with
+                # installer app in the root of the dmg. the dmg also happens to have a volume name that matches
+                # the basename of the srcfolder which is generally the installer app name.
+                #
+                # this code will create an empty folder that will act as the root folder
+                # where the relevant app's parent directory will be placed.
+                #
+                # hdiutil chooses the dmg volume name based on the base name of the path
+                # provided. the base name tends to be "Install macOS Big Sur.app" but
+                # hdiutil does not include ".app" in the volume name. to have a friendly
+                # volume name, this code generates a dmg volume name (e.g. dmg_name)
+                # based on the installer app name.
+                #
+                # The dmg volume name is used as the name of the empty root folder where
+                # the app bundle's parent directory will be moved to.
+                # 
+                # variable to determine jamf root folder name
                 dmg_name = os.path.basename(os.path.normpath(app_path)).rstrip('.app')
-                jamf_root = mountpoint + '/' + dmg_name
+                jamf_root = os.path.join(mountpoint, dmg_name)
                 # create jamf root folder
                 os.mkdir(jamf_root)
                 # determine parent directory for installer app
