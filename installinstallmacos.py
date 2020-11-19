@@ -153,14 +153,14 @@ def make_sparse_image(volume_name, output_path):
         exit(-1)
 
 
-def make_compressed_dmg(app_path, diskimagepath):
+def make_compressed_dmg(app_path, vol_name, diskimagepath):
     """Returns path to newly-created compressed r/o disk image containing
     Install macOS.app"""
 
     print('Making read-only compressed disk image containing %s...'
           % os.path.basename(app_path))
     cmd = ['/usr/bin/hdiutil', 'create', '-fs', 'HFS+',
-           '-srcfolder', app_path, diskimagepath]
+           '-srcfolder', app_path, '-volname', vol_name, diskimagepath]
     try:
         subprocess.check_call(cmd)
     except subprocess.CalledProcessError as err:
@@ -624,38 +624,36 @@ def main():
             if os.path.exists(compressed_diskimagepath):
                 os.unlink(compressed_diskimagepath)
             app_path = find_installer_app(mountpoint)
+            # generate volume name based on installer app name
+            compressed_dmg_volname = os.path.basename(os.path.normpath(app_path))
             if args.jamf_dmg:
                 # if --jamf-dmg option is given, create a jamf pro deployable dmg
                 # jamf pro supports dmg installs by mounting the dmg and copying the file
                 # structure of the dmg to the target volume.
                 # currently the --compress (default) code will generate a dmg with
-                # installer app in the root of the dmg. the dmg also happens to have a volume name that matches
-                # the basename of the srcfolder which is generally the installer app name.
+                # installer app in the root of the dmg. if deployed with jamf as is, the
+                # installer app would end up in the root of the target volume.
                 #
                 # this code will create an empty folder that will act as the root folder
-                # where the relevant app's parent directory will be placed.
+                # where the relevant app's parent directory will be placed. the end result
+                # is a dmg that contains a file structure of
+                # "/Applications/Install macOS.app" which jamf can deploy.
                 #
-                # hdiutil chooses the dmg volume name based on the base name of the path
-                # provided. the base name tends to be "Install macOS Big Sur.app" but
-                # hdiutil does not include ".app" in the volume name. to have a friendly
-                # volume name, this code generates a dmg volume name (e.g. dmg_name)
-                # based on the installer app name.
-                #
-                # The dmg volume name is used as the name of the empty root folder where
-                # the app bundle's parent directory will be moved to.
-                # 
-                # variable to determine jamf root folder name
-                dmg_name = os.path.basename(os.path.normpath(app_path)).rstrip('.app')
-                jamf_root = os.path.join(mountpoint, dmg_name)
+                # name of jamf root folder where installer app's parent directory will
+                # be moved into
+                jamf_root = os.path.join(mountpoint, 'jamf')
                 # create jamf root folder
                 os.mkdir(jamf_root)
                 # determine parent directory for installer app
                 parent_app_path = os.path.dirname(app_path)
                 # move folders around to create necessary jamf supported dmg
                 shutil.move(parent_app_path, jamf_root)
+                # re-assign app_path variable so dmg is made from jamf root folder
                 app_path = jamf_root
             if app_path:
-                make_compressed_dmg(app_path, compressed_diskimagepath)
+                make_compressed_dmg(app_path,
+                                    compressed_dmg_volname,
+                                    compressed_diskimagepath)
             # unmount sparseimage
             unmountdmg(mountpoint)
             # delete sparseimage since we don't need it any longer
