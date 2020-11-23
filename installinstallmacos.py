@@ -570,9 +570,8 @@ def find_mac_os_installers(catalog, installassistant_pkg_only=False):
             # account for args.pkg
             if installassistant_pkg_only:
                 try:
-                    if product['ExtendedMetaInfo']['InstallAssistantPackageIdentifiers']:
-                        if product['ExtendedMetaInfo']['InstallAssistantPackageIdentifiers']['SharedSupport'] == 'com.apple.pkg.InstallAssistant.macOSBigSur':
-                            mac_os_installer_products.append(product_key)
+                    if product['ExtendedMetaInfo']['InstallAssistantPackageIdentifiers']['SharedSupport']:
+                        mac_os_installer_products.append(product_key)
                 except KeyError:
                     continue
             else:
