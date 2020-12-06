@@ -949,8 +949,10 @@ def main():
 
         # skip if an OS is selected and it does not match
         if args.os:
-            major = product_info[product_id]["version"].split(".", 2)[:2]
-            os_version = ".".join(major)
+            os_version = product_info[product_id]["version"].split(".")[0]
+            if int(os_version) == 10:
+                major = product_info[product_id]["version"].split(".", 2)[:2]
+                os_version = ".".join(major)
             if args.os != os_version:
                 continue
 
