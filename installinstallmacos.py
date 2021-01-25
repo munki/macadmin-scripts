@@ -285,7 +285,7 @@ def replicate_url(full_url,
     except subprocess.CalledProcessError as err:
         # Ignore HTTP error 416 on resume - it indicates that the download is
         # already complete
-        if not resumed or (int(err.output) != 416):
+        if not resumed or not err.output.isdigit() or (int(err.output) != 416):
             raise ReplicationError(err)
     return local_file_path
 
