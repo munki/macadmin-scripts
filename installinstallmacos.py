@@ -266,21 +266,26 @@ def replicate_url(full_url,
         options = '-sfL'
     curl_cmd = ['/usr/bin/curl', options,
                 '--create-dirs',
-                '-o', local_file_path]
+                '-o', local_file_path,
+                '-w', '%{http_code}']
     if not full_url.endswith(".gz"):
         # stupid hack for stupid Apple behavior where it sometimes returns
         # compressed files even when not asked for
         curl_cmd.append('--compressed')
+    resumed = False
     if not ignore_cache and os.path.exists(local_file_path):
         curl_cmd.extend(['-z', '-' + local_file_path])
         if attempt_resume:
+            resumed = True
             curl_cmd.extend(['-C', '-'])
     curl_cmd.append(full_url)
     print("Downloading %s..." % full_url)
     try:
-        subprocess.check_call(curl_cmd)
+        output = subprocess.check_output(curl_cmd)
     except subprocess.CalledProcessError as err:
-        raise ReplicationError(err)
+        if resumed and int(err.output) != 416:
+            # Ignore HTTP error 416 on resume - it indicates that the download is already complete
+            raise ReplicationError(err)
     return local_file_path
 
 
