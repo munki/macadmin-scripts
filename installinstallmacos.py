@@ -57,7 +57,7 @@ DEFAULT_SUCATALOGS = {
     "index-10.15-10.14-10.13-10.12-10.11-10.10-10.9"
     "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog",
     "20": "https://swscan.apple.com/content/catalogs/others/"
-    "index-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9"
+    "index-11-10.15-10.14-10.13-10.12-10.11-10.10-10.9"
     "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog",
 }
 
@@ -401,21 +401,45 @@ def replicate_url(
         options = "-fL"
     else:
         options = "-sfL"
-    curl_cmd = ["/usr/bin/curl", options, "--create-dirs", "-o", local_file_path]
-    if not full_url.endswith(".gz"):
-        # stupid hack for stupid Apple behavior where it sometimes returns
-        # compressed files even when not asked for
-        curl_cmd.append("--compressed")
-    if not ignore_cache and os.path.exists(local_file_path):
-        curl_cmd.extend(["-z", local_file_path])
-        if attempt_resume:
-            curl_cmd.extend(["-C", "-"])
-    curl_cmd.append(full_url)
-    # print("Downloading %s..." % full_url)
-    try:
-        subprocess.check_call(curl_cmd)
-    except subprocess.CalledProcessError as err:
-        raise ReplicationError(err)
+    need_download = True
+    while need_download:
+        curl_cmd = [
+            "/usr/bin/curl",
+            options,
+            "--create-dirs",
+            "-o",
+            local_file_path,
+            "-w",
+            "%{http_code}",
+        ]
+        if not full_url.endswith(".gz"):
+            # stupid hack for stupid Apple behavior where it sometimes returns
+            # compressed files even when not asked for
+            curl_cmd.append("--compressed")
+        resumed = False
+        if not ignore_cache and os.path.exists(local_file_path):
+            if not attempt_resume:
+                curl_cmd.extend(["-z", local_file_path])
+            else:
+                resumed = True
+                curl_cmd.extend(["-z", "-" + local_file_path, "-C", "-"])
+        curl_cmd.append(full_url)
+        # print("Downloading %s..." % full_url)
+        need_download = False
+        try:
+            _ = subprocess.check_output(curl_cmd)
+        except subprocess.CalledProcessError as err:
+            if not resumed or not err.output.isdigit():
+                raise ReplicationError(err)
+            # HTTP error 416 on resume: the download is already complete and the
+            # file is up-to-date
+            # HTTP error 412 on resume: the file was updated server-side
+            if int(err.output) == 412:
+                print("Removing %s and retrying." % local_file_path)
+                os.unlink(local_file_path)
+                need_download = True
+            elif int(err.output) != 416:
+                raise ReplicationError(err)
     return local_file_path
 
 
