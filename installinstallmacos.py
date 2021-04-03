@@ -541,8 +541,6 @@ def main():
             print('*** If this does not run as expected, please run again from', file=sys.stderr)
             print('*** somewhere else, such as /Users/Shared.', file=sys.stderr)
             print('*********************************************************', file=sys.stderr)
-        else:
-            print('bad_dir %s not in current_dir %s' % (home_dir + os.path.sep + bad_dir, current_dir))
 
     if args.catalogurl:
         su_catalog_url = args.catalogurl
