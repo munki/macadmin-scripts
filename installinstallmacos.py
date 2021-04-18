@@ -994,7 +994,7 @@ def main():
         if not_valid and (
             args.validate
             or (args.auto or args.version or args.os)
-            # and not args.beta  # not needed now we have DeviceID check
+            # and not args.beta  # not needed now we have DeviceID check
         ):
             continue
 
@@ -1010,7 +1010,7 @@ def main():
                     major = product_info[product_id]["version"].split(".", 2)[:2]
                     os_version = ".".join(major)
             except ValueError:
-                #  Account for when no version information is given
+                # Account for when no version information is given
                 os_version = ""
             if args.os != os_version:
                 continue
@@ -1024,7 +1024,7 @@ def main():
                 except NameError:
                     latest_valid_build = product_info[product_id]["BUILD"]
                     # if using newer-than option, skip if not newer than the version
-                    #  we are checking against
+                    # we are checking against
                     if args.newer_than_version:
                         latest_valid_build = get_latest_version(
                             product_info[product_id]["version"], args.newer_than_version
@@ -1044,7 +1044,7 @@ def main():
                     )
                     if latest_valid_build == product_info[product_id]["BUILD"]:
                         # if using newer-than option, skip if not newer than the version
-                        #  we are checking against
+                        # we are checking against
                         if args.newer_than_version:
                             latest_valid_build = get_latest_version(
                                 product_info[product_id]["version"],
@@ -1234,8 +1234,8 @@ def main():
         print("Exiting.")
         exit(0)
 
-    #  shortened workflow if we just want a macOS Big Sur+ package
-    #  taken from @scriptingosx's Fetch-Installer-Pkg project
+    # shortened workflow if we just want a macOS Big Sur+ package
+    # taken from @scriptingosx's Fetch-Installer-Pkg project
     # (https://github.com/scriptingosx/fetch-installer-pkg)
     if args.pkg:
         product = catalog["Products"][product_id]
