@@ -535,7 +535,7 @@ def main():
     current_dir = os.getcwd()
     bad_subdirs = ['Documents', 'Desktop', 'Downloads', 'Library']
     for bad_subdir in bad_subdirs:
-        bad_dir = home_dir + os.path.sep + bad_subdir
+        bad_dir = os.path.join(home_dir, bad_subdir)
         if bad_dir in current_dir:
             print('*********************************************************', file=sys.stderr)
             print('*** Running this script from %s may not work as expected.' % current_dir, file=sys.stderr)
