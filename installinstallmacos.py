@@ -460,7 +460,7 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
                 product_info[product_key]['title'] = dist_info.get('title_from_dist')
             if not product_info[product_key]['version']:
                 product_info[product_key]['version'] = dist_info.get('VERSION')
-        
+
     return product_info
 
 
@@ -538,7 +538,8 @@ def main():
         bad_dir = os.path.join(home_dir, bad_subdir)
         if bad_dir in current_dir:
             print('*********************************************************', file=sys.stderr)
-            print('*** Running this script from %s may not work as expected.' % current_dir, file=sys.stderr)
+            print('*** Running this script from %s may not work as expected.' % current_dir,
+                  file=sys.stderr)
             print('*** If this does not run as expected, please run again from', file=sys.stderr)
             print('*** somewhere else, such as /Users/Shared.', file=sys.stderr)
             print('*********************************************************', file=sys.stderr)
