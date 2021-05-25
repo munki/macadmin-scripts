@@ -536,7 +536,7 @@ def main():
     bad_subdirs = ['Documents', 'Desktop', 'Downloads', 'Library']
     for bad_subdir in bad_subdirs:
         bad_dir = os.path.join(home_dir, bad_subdir)
-        if bad_dir in current_dir:
+        if current_dir.startswith(bad_dir):
             print('*********************************************************\n'
                   '*** Running this script from %s may not work as expected.\n'
                   '*** If this does not run as expected, please run again\n'
