@@ -268,8 +268,8 @@ def replicate_url(full_url,
     need_download = True
     while need_download:
         curl_cmd = ['/usr/bin/curl', options,
-                    '-o', tmp_file_path,
-                    '--create-dirs']
+                    '--create-dirs',
+                    '-o', tmp_file_path]
         if not full_url.endswith(".gz"):
             # stupid hack for stupid Apple behavior where it sometimes returns
             # compressed files even when not asked for
