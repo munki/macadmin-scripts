@@ -285,7 +285,7 @@ def replicate_url(full_url,
         print("Downloading %s..." % full_url)
         need_download = False
         try:
-            _ = subprocess.check_output(curl_cmd)
+            output = subprocess.check_output(curl_cmd)
         except subprocess.CalledProcessError as err:
             if not resumed or not err.output.isdigit():
                 raise ReplicationError(err)
