@@ -3,6 +3,8 @@
 Some scripts that might be of use to macOS admins. Might be related to Munki;
 might not.
 
+These are only supported using Apple's Python on macOS. There is no support for running these on Windows or Linux.
+
 #### installinstallmacos.py
 
 This script can create disk images containing macOS Installer applications available via Apple's softwareupdate catalogs.
