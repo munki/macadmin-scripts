@@ -39,39 +39,8 @@ Use a compatible Mac or select a different build compatible with your current ha
 ##### Important note for Catalina+
 Catalina privacy protections might interfere with the operation of this tool if you run it from ~/Desktop, ~/Documents, ~/Downloads or other directories protected in Catalina. Consider using /Users/Shared (or subdirectory) as the "working space" for this tool.
 
-##### October 2020 update
-In late September, Apple made some changes to how their servers returned requested results. This led to `installinstallmacos.py` complaining about invalid XML and listing macOS installers with UNKNOWN build numbers, among other issues.
-If you encounter these issues:
-  - Update to the current version of the script
-  - Run it at least once with the `--ignore-cache` option, or remove the content directory to remove corrupted files in the content cache.
 
 ##### Alternate implementations
 Graham Pugh has a fork with a lot more features and bells and whistles. Check it out if your needs aren't met by this tool.
 https://github.com/grahampugh/macadmin-scripts
-
------
-
-### Legacy scripts no longer in development or supported
-
-#### createbootvolfromautonbi.py
-
-(This tool has not been tested/updated since before 10.14 shipped. It may not work as expected with current versions of macOS. There are currently no plans to update it.)
-
-A tool to make bootable disk volumes from the output of autonbi. Especially
-useful to make bootable disks containing Imagr and the 'SIP-ignoring' kernel,
-which allows Imagr to run scripts that affect SIP state, set UAKEL options, and
-run the `startosinstall` component, all of which might otherwise require network
-booting from a NetInstall-style nbi.
-
-This provides a way to create a bootable external disk that acts like the Netboot environment used by/needed by Imagr.
-
-This command converts the output of Imagr's `make nbi` into a bootable external USB disk:
-`sudo ./createbootvolfromautonbi.py --nbi ~/Desktop/10.13.6_Imagr.nbi --volume /Volumes/ExternalDisk`
-
-
-#### make_firmwareupdater_pkg.sh
-
-This script was used to extract the firmware updaters from early High Sierra installers and make a standalone installer package that could be used to upgrade Mac firmware before installing High Sierra via imaging.
-
-Later High Sierra installer changes have broken this script; since installing High Sierra via imaging is not recommended or supported by Apple and several other alternatives are now available, I don't plan on attempting to fix or upgrade this tool.
 
