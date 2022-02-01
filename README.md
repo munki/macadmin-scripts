@@ -3,7 +3,9 @@
 Some scripts that might be of use to macOS admins. Might be related to Munki;
 might not.
 
-These are only supported using Apple's Python on macOS. There is no support for running these on Windows or Linux.
+These are currently only supported using Apple's Python on macOS. There is no support for running these on Windows or Linux.
+
+In macOS 12.3, Apple will be removing its Python 2.7 install. You'll need to provide your own Python to use these scripts. You may also need to install additional Python modules.
 
 #### getmacosipsws.py
 
@@ -13,7 +15,7 @@ Quick-and-dirty tool to download the macOS IPSW files currently advertised by Ap
 
 This script can create disk images containing macOS Installer applications available via Apple's softwareupdate catalogs.
 
-Run `./installinstallmacos.py --help` to see the available options.
+Run `python ./installinstallmacos.py --help` to see the available options.
 
 The tool assembles "Install macOS" applications by downloading the packages from Apple's softwareupdate servers and then installing them into a new empty disk image.
 
