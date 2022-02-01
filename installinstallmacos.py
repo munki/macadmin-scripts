@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # encoding: utf-8
 #
 # Copyright 2017 Greg Neagle.
@@ -41,7 +41,13 @@ except ImportError:
     from urlparse import urlsplit
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
-import xattr
+
+try:
+    import xattr
+except ImportError:
+    print("This tool requires the Python xattr module. "
+          "Perhaps run `pip install xattr` to install it.")
+    sys.exit(-1)
 
 
 DEFAULT_SUCATALOGS = {
