@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # encoding: utf-8
 #
-# Copyright 2017 Greg Neagle.
+# Copyright 2017-2022 Greg Neagle.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,7 +33,6 @@ import plistlib
 import shutil
 import subprocess
 import sys
-import xattr
 
 try:
     # python 2
@@ -44,6 +43,15 @@ except ImportError:
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
 from distutils.version import LooseVersion
+
+try:
+    import xattr
+except ImportError:
+    print(
+        "This tool requires the Python xattr module. "
+        "Perhaps run `pip install xattr` to install it."
+    )
+    sys.exit(-1)
 
 
 DEFAULT_SUCATALOGS = {
