@@ -1,7 +1,7 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 # encoding: utf-8
 #
-# Copyright 2017 Greg Neagle.
+# Copyright 2017-2022 Greg Neagle.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -33,7 +33,6 @@ import plistlib
 import shutil
 import subprocess
 import sys
-import xattr
 
 try:
     # python 2
@@ -45,23 +44,42 @@ from xml.dom import minidom
 from xml.parsers.expat import ExpatError
 from distutils.version import LooseVersion
 
+try:
+    import xattr
+except ImportError:
+    print(
+        "This tool requires the Python xattr module. "
+        "Perhaps run `pip install xattr` to install it."
+    )
+    sys.exit(-1)
+
 
 DEFAULT_SUCATALOGS = {
-    "17": "https://swscan.apple.com/content/catalogs/others/"
-    "index-10.13-10.12-10.11-10.10-10.9"
-    "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog",
-    "18": "https://swscan.apple.com/content/catalogs/others/"
-    "index-10.14-10.13-10.12-10.11-10.10-10.9"
-    "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog",
-    "19": "https://swscan.apple.com/content/catalogs/others/"
-    "index-10.15-10.14-10.13-10.12-10.11-10.10-10.9"
-    "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog",
-    "20": "https://swscan.apple.com/content/catalogs/others/"
-    "index-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9"
-    "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog",
-    "21": "https://swscan.apple.com/content/catalogs/others/"
-    "index-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9"
-    "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog",
+    "17": (
+        "https://swscan.apple.com/content/catalogs/others/"
+        "index-10.13-10.12-10.11-10.10-10.9"
+        "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+    ),
+    "18": (
+        "https://swscan.apple.com/content/catalogs/others/"
+        "index-10.14-10.13-10.12-10.11-10.10-10.9"
+        "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+    ),
+    "19": (
+        "https://swscan.apple.com/content/catalogs/others/"
+        "index-10.15-10.14-10.13-10.12-10.11-10.10-10.9"
+        "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+    ),
+    "20": (
+        "https://swscan.apple.com/content/catalogs/others/"
+        "index-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9"
+        "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+    ),
+    "21": (
+        "https://swscan.apple.com/content/catalogs/others/"
+        "index-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9"
+        "-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog"
+    ),
 }
 
 SEED_CATALOGS_PLIST = (
@@ -233,9 +251,10 @@ def get_seeding_programs():
         return ""
 
 
-def get_default_catalog():
+def get_default_catalog(darwin_major=None):
     """Returns the default softwareupdate catalog for the current OS"""
-    darwin_major = os.uname()[2].split(".")[0]
+    if not darwin_major:
+        darwin_major = os.uname()[2].split(".")[0]
     return DEFAULT_SUCATALOGS.get(darwin_major)
 
 
@@ -678,10 +697,13 @@ def os_installer_product_info(
 
 def get_latest_version(current_item, latest_item):
     """Compares versions between two values and returns the latest (highest) value"""
-    if LooseVersion(current_item) > LooseVersion(latest_item):
+    try:
+        if LooseVersion(current_item) > LooseVersion(latest_item):
+            return current_item
+        else:
+            return latest_item
+    except TypeError:
         return current_item
-    else:
-        return latest_item
 
 
 def replicate_product(catalog, product_id, workdir, ignore_cache=False):
@@ -750,6 +772,12 @@ def main():
         default="",
         help="Software Update catalog URL. This option "
         "overrides any seedprogram option.",
+    )
+    parser.add_argument(
+        "--catalog",
+        default="",
+        help="Software Update catalog for a specific macOS version. "
+        "This option overrides any seedprogram option.",
     )
     parser.add_argument(
         "--workdir",
@@ -900,13 +928,25 @@ def main():
         su_catalog_url = args.catalogurl
     elif args.seedprogram:
         su_catalog_url = get_seed_catalog(args.seedprogram)
-        if not su_catalog_url:
+        if su_catalog_url:
+            print("Using catalog for Seed Program {}.\n".format(args.seedprogram))
+        else:
             print(
                 "Could not find a catalog url for seed program %s" % args.seedprogram,
                 file=sys.stderr,
             )
             print(
                 "Valid seeding programs are: %s" % ", ".join(get_seeding_programs()),
+                file=sys.stderr,
+            )
+            exit(-1)
+    elif args.catalog:
+        su_catalog_url = get_default_catalog(args.catalog)
+        if su_catalog_url:
+            print("Using catalog for Darwin v{}.\n".format(args.catalog))
+        else:
+            print(
+                "Could not find a default catalog url for this OS version.",
                 file=sys.stderr,
             )
             exit(-1)
