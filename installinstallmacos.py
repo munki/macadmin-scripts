@@ -42,14 +42,18 @@ except ImportError:
     from urlparse import urlsplit
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
-from distutils.version import LooseVersion
+
+try:
+    from packaging.version import Version
+except ImportError:
+    from distutils.version import LooseVersion as Version
 
 try:
     import xattr
 except ImportError:
     print(
-        "This tool requires the Python xattr module. "
-        "Perhaps run `pip install xattr` to install it."
+        "This tool requires the Python xattr and packaging modules. "
+        "Perhaps run `pip install xattr packaging` to install them."
     )
     sys.exit(-1)
 
@@ -698,7 +702,7 @@ def os_installer_product_info(
 def get_latest_version(current_item, latest_item):
     """Compares versions between two values and returns the latest (highest) value"""
     try:
-        if LooseVersion(current_item) > LooseVersion(latest_item):
+        if Version(current_item) > Version(latest_item):
             return current_item
         else:
             return latest_item
