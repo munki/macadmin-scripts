@@ -43,17 +43,14 @@ except ImportError:
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
 
-try:
-    from packaging.version import Version
-except ImportError:
-    from distutils.version import LooseVersion as Version
+from pkg_resources import parse_version as Version
 
 try:
     import xattr
 except ImportError:
     print(
-        "This tool requires the Python xattr and packaging modules. "
-        "Perhaps run `pip install xattr packaging` to install them."
+        "This tool requires the Python xattr module. "
+        "Perhaps run `pip install xattr` to install it."
     )
     sys.exit(-1)
 
@@ -1136,10 +1133,10 @@ def main():
         valid_build_found is False
         and not args.build
         and not args.current
-        and not args.validate
+        and args.validate
         and not args.list
     ):
-        print("No valid build found for this hardware")
+        print("No valid build found for this computer")
         exit(0)
 
     # clear content directory in workdir if requested
@@ -1162,23 +1159,21 @@ def main():
         except NameError:
             print(
                 "\n"
-                "Build %s is not available. "
+                "A valid installer for build %s is not available for this computer. "
                 "Run again without --build argument "
                 "to select a valid build to download "
                 "or run without --validate option to download anyway.\n" % args.build
             )
             exit(0)
         else:
-            print(
-                "\n" "Build %s available. Downloading #%s...\n" % (args.build, answer)
-            )
+            print("\n" "Build %s valid. Downloading #%s...\n" % (args.build, answer))
     elif args.current:
         try:
             answer
         except NameError:
             print(
                 "\n"
-                "Build %s is not available. "
+                "A valid installer for build %s is not available for this computer. "
                 "Run again without --current argument "
                 "to select a valid build to download.\n" % build_info[0]
             )
@@ -1226,7 +1221,7 @@ def main():
         except NameError:
             print(
                 "\n"
-                "Version %s is not available. "
+                "A valid installer for version %s is not available for this computer. "
                 "Run again without --version argument "
                 "to select a valid build to download.\n" % args.version
             )
@@ -1242,7 +1237,7 @@ def main():
         except NameError:
             print(
                 "\n"
-                "OS %s is not available. "
+                "A valid installer for OS %s is not available for this computer. "
                 "Run again without --os argument "
                 "to select a valid build to download.\n" % args.os
             )
@@ -1258,7 +1253,7 @@ def main():
         except NameError:
             print(
                 "\n"
-                "No valid version available. "
+                "No valid version available for this computer. "
                 "Run again without --auto argument "
                 "to select a valid build to download.\n"
             )
