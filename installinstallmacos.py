@@ -68,6 +68,9 @@ DEFAULT_SUCATALOGS = {
           '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog',
     '22': 'https://swscan.apple.com/content/catalogs/others/'
           'index-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9'
+          '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog',
+    '23': 'https://swscan.apple.com/content/catalogs/others/'
+          'index-14-13-12-10.16-10.15-10.14-10.13-10.12-10.11-10.10-10.9'
           '-mountainlion-lion-snowleopard-leopard.merged-1.sucatalog'
 }
 
