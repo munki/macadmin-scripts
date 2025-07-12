@@ -5,7 +5,7 @@ might not.
 
 These are currently only supported using Apple's Python on macOS. There is no support for running these on Windows or Linux.
 
-In macOS 12.3, Apple will be removing its Python 2.7 install. You'll need to provide your own Python to use these scripts. You may also need to install additional Python modules.
+In macOS 12.3, Apple stopped providung Python as part of macOS. You'll need to provide your own Python to use these scripts. You may also need to install additional Python modules.
 
 #### getmacosipsws.py
 
