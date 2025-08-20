@@ -239,7 +239,12 @@ def install_product(dist_path, target_vol):
     # set CM_BUILD env var to make Installer bypass eligibilty checks
     # when installing packages (for machine-specific OS builds)
     os.environ["CM_BUILD"] = "CM_BUILD"
-    cmd = ['/usr/sbin/installer', '-pkg', dist_path, '-target', target_vol]
+    #cmd = ['/usr/sbin/installer', '-pkg', dist_path, '-target', target_vol]
+    # a hack to work around a change in macOS 15.6+ since installing a .dist
+    # file no longer works
+    dist_dir = os.path.dirname(dist_path)
+    install_asst_pkg = os.path.join(dist_dir, "InstallAssistant.pkg")
+    cmd = ['/usr/sbin/installer', '-pkg', install_asst_pkg, '-target', target_vol]
     try:
         subprocess.check_call(cmd)
     except subprocess.CalledProcessError as err:
