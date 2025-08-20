@@ -487,7 +487,7 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
                 product_info[product_key]['title'] = dist_info.get('title_from_dist')
             if not product_info[product_key]['version']:
                 product_info[product_key]['version'] = dist_info.get('VERSION')
-        
+
     return product_info
 
 
@@ -558,15 +558,18 @@ def main():
         sys.exit('This command requires root (to install packages), so please '
                  'run again with sudo or as root.')
 
+    home_dir = os.path.expanduser("~")
     current_dir = os.getcwd()
-    if os.path.expanduser("~") in current_dir:
-        bad_dirs = ['Documents', 'Desktop', 'Downloads', 'Library']
-        for bad_dir in bad_dirs:
-            if bad_dir in os.path.split(current_dir):
-                print('Running this script from %s may not work as expected. '
-                      'If this does not run as expected, please run again from '
-                      'somewhere else, such as /Users/Shared.'
-                      % current_dir, file=sys.stderr)
+    bad_subdirs = ['Documents', 'Desktop', 'Downloads', 'Library']
+    for bad_subdir in bad_subdirs:
+        bad_dir = os.path.join(home_dir, bad_subdir)
+        if current_dir.startswith(bad_dir):
+            print('*********************************************************\n'
+                  '*** Running this script from %s may not work as expected.\n'
+                  '*** If this does not run as expected, please run again\n'
+                  '*** from somewhere else, such as /Users/Shared.\n'
+                  '*********************************************************'
+                  % current_dir, file=sys.stderr)
 
     if args.catalogurl:
         su_catalog_url = args.catalogurl
