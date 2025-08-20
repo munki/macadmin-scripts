@@ -279,7 +279,8 @@ def replicate_url(full_url,
                   root_dir='/tmp',
                   show_progress=False,
                   ignore_cache=False,
-                  attempt_resume=False):
+                  attempt_resume=False,
+                  limit_rate=None):
     '''Downloads a URL and stores it in the same relative path on our
     filesystem. Returns a path to the replicated file.'''
 
@@ -297,6 +298,10 @@ def replicate_url(full_url,
                     '--create-dirs',
                     '-o', local_file_path,
                     '-w', '%{http_code}']
+
+        if limit_rate is not None:
+            curl_cmd.extend(['--limit-rate', limit_rate])
+
         if not full_url.endswith(".gz"):
             # stupid hack for stupid Apple behavior where it sometimes returns
             # compressed files even when not asked for
@@ -491,7 +496,12 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
     return product_info
 
 
-def replicate_product(catalog, product_id, workdir, ignore_cache=False):
+def replicate_product(
+    catalog,
+    product_id,
+    workdir,
+    ignore_cache=False,
+    limit_rate=None):
     '''Downloads all the packages for a product'''
     product = catalog['Products'][product_id]
     for package in product.get('Packages', []):
@@ -503,7 +513,8 @@ def replicate_product(catalog, product_id, workdir, ignore_cache=False):
                 replicate_url(
                     package['URL'], root_dir=workdir,
                     show_progress=True, ignore_cache=ignore_cache,
-                    attempt_resume=(not ignore_cache))
+                    attempt_resume=(not ignore_cache),
+                    limit_rate=limit_rate)
             except ReplicationError as err:
                 print('Could not replicate %s: %s' % (package['URL'], err),
                       file=sys.stderr)
@@ -511,7 +522,8 @@ def replicate_product(catalog, product_id, workdir, ignore_cache=False):
         if 'MetadataURL' in package:
             try:
                 replicate_url(package['MetadataURL'], root_dir=workdir,
-                              ignore_cache=ignore_cache)
+                              ignore_cache=ignore_cache,
+                              limit_rate=limit_rate)
             except ReplicationError as err:
                 print('Could not replicate %s: %s'
                       % (package['MetadataURL'], err), file=sys.stderr)
@@ -552,6 +564,8 @@ def main():
                         'less available disk space and is faster.')
     parser.add_argument('--ignore-cache', action='store_true',
                         help='Ignore any previously cached files.')
+    parser.add_argument('--limit-rate', metavar='limit_rate', default=None,
+                        help='limit the download speed per curl --limit-rate')
     args = parser.parse_args()
 
     if os.getuid() != 0:
@@ -622,7 +636,11 @@ def main():
 
     # download all the packages for the selected product
     replicate_product(
-        catalog, product_id, args.workdir, ignore_cache=args.ignore_cache)
+        catalog,
+        product_id,
+        args.workdir,
+        ignore_cache=args.ignore_cache,
+        limit_rate=args.limit_rate)
 
     # generate a name for the sparseimage
     volname = ('Install_macOS_%s-%s'
