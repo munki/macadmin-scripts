@@ -287,6 +287,7 @@ def replicate_url(full_url,
     relative_url = path.lstrip('/')
     relative_url = os.path.normpath(relative_url)
     local_file_path = os.path.join(root_dir, relative_url)
+    tmp_file_path = local_file_path + ".partial"
     if show_progress:
         options = '-fL'
     else:
@@ -295,36 +296,38 @@ def replicate_url(full_url,
     while need_download:
         curl_cmd = ['/usr/bin/curl', options,
                     '--create-dirs',
-                    '-o', local_file_path,
-                    '-w', '%{http_code}']
+                    '-o', tmp_file_path]
         if not full_url.endswith(".gz"):
             # stupid hack for stupid Apple behavior where it sometimes returns
             # compressed files even when not asked for
             curl_cmd.append('--compressed')
         resumed = False
         if not ignore_cache and os.path.exists(local_file_path):
-            if not attempt_resume:
-                curl_cmd.extend(['-z', local_file_path])
-            else:
-                resumed = True
-                curl_cmd.extend(['-z', '-' + local_file_path, '-C', '-'])
+            os.rename(local_file_path, tmp_file_path)
+            # Re-download file only if it was updated server-side
+            curl_cmd.extend(['-z', tmp_file_path])
+        elif (not ignore_cache and attempt_resume and
+              os.path.exists(tmp_file_path)):
+            resumed = True
+            # Continue download only if file was not updated server-side
+            curl_cmd.extend(['-z', '-' + tmp_file_path,
+                             '-C', '-',
+                             '-w', '%{http_code}'])
+
         curl_cmd.append(full_url)
         print("Downloading %s..." % full_url)
         need_download = False
         try:
-            output = subprocess.check_output(curl_cmd)
+            _ = subprocess.check_output(curl_cmd)
         except subprocess.CalledProcessError as err:
-            if not resumed or not err.output.isdigit():
-                raise ReplicationError(err)
-            # HTTP error 416 on resume: the download is already complete and the
-            # file is up-to-date
             # HTTP error 412 on resume: the file was updated server-side
-            if int(err.output) == 412:
-                print("Removing %s and retrying." % local_file_path)
-                os.unlink(local_file_path)
+            if resumed and err.output.isdigit() and int(err.output) == 412:
+                print("Removing %s and retrying." % tmp_file_path)
+                os.unlink(tmp_file_path)
                 need_download = True
-            elif int(err.output) != 416:
+            else:
                 raise ReplicationError(err)
+    os.rename(tmp_file_path, local_file_path)
     return local_file_path
 
 
