@@ -33,6 +33,7 @@ import os
 import plistlib
 import subprocess
 import sys
+import platform
 try:
     # python 2
     from urllib.parse import urlsplit
@@ -245,8 +246,22 @@ def install_product(dist_path, target_vol, is_legacy):
     # set CM_BUILD env var to make Installer bypass eligibilty checks
     # when installing packages (for machine-specific OS builds)
     os.environ["CM_BUILD"] = "CM_BUILD"
+    # check if running on Sequoia 15.6+
+    is_15_6_or_later = False
+    os_ver = platform.mac_ver()[0].split('.')
+    ver_major = int(os_ver[0])
+    ver_minor = int(os_ver[1])
+    if ver_major >= 15:
+      if ver_major > 15 or ver_minor >= 6:
+        is_15_6_or_later = True
     if is_legacy:
-      cmd = ['/usr/sbin/installer', '-pkg', dist_path, '-target', target_vol]
+      if is_15_6_or_later:
+        print('*** Error: building High Sierra, Mojave, and Catalina installer images')
+        print('*** is unsupported on macOS Sequoia 15.6 and later due to breaking changes')
+        print('*** in /usr/sbin/installer by Apple.')
+        return False
+      else:
+        cmd = ['/usr/sbin/installer', '-pkg', dist_path, '-target', target_vol]
     else:
       # a hack to work around a change in macOS 15.6+ since installing a .dist
       # file no longer works
