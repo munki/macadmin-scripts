@@ -33,6 +33,7 @@ import os
 import plistlib
 import subprocess
 import sys
+import platform
 try:
     # python 2
     from urllib.parse import urlsplit
@@ -233,18 +234,40 @@ def unmountdmg(mountpoint):
             print('Failed to unmount %s' % mountpoint, file=sys.stderr)
 
 
-def install_product(dist_path, target_vol):
+def check_is_legacy(title):
+  if "Sierra" in title or "Mojave" in title or "Catalina" in title:
+    return True
+  return False
+
+
+def install_product(dist_path, target_vol, is_legacy):
     '''Install a product to a target volume.
     Returns a boolean to indicate success or failure.'''
     # set CM_BUILD env var to make Installer bypass eligibilty checks
     # when installing packages (for machine-specific OS builds)
     os.environ["CM_BUILD"] = "CM_BUILD"
-    #cmd = ['/usr/sbin/installer', '-pkg', dist_path, '-target', target_vol]
-    # a hack to work around a change in macOS 15.6+ since installing a .dist
-    # file no longer works
-    dist_dir = os.path.dirname(dist_path)
-    install_asst_pkg = os.path.join(dist_dir, "InstallAssistant.pkg")
-    cmd = ['/usr/sbin/installer', '-pkg', install_asst_pkg, '-target', target_vol]
+    # check if running on Sequoia 15.6+
+    is_15_6_or_later = False
+    os_ver = platform.mac_ver()[0].split('.')
+    ver_major = int(os_ver[0])
+    ver_minor = int(os_ver[1])
+    if ver_major >= 15:
+      if ver_major > 15 or ver_minor >= 6:
+        is_15_6_or_later = True
+    if is_legacy:
+      if is_15_6_or_later:
+        print('*** Error: building High Sierra, Mojave, and Catalina installer images')
+        print('*** is unsupported on macOS Sequoia 15.6 and later due to breaking changes')
+        print('*** in /usr/sbin/installer by Apple.')
+        return False
+      else:
+        cmd = ['/usr/sbin/installer', '-pkg', dist_path, '-target', target_vol]
+    else:
+      # a hack to work around a change in macOS 15.6+ since installing a .dist
+      # file no longer works
+      dist_dir = os.path.dirname(dist_path)
+      install_asst_pkg = os.path.join(dist_dir, "InstallAssistant.pkg")
+      cmd = ['/usr/sbin/installer', '-pkg', install_asst_pkg, '-target', target_vol]
     try:
         subprocess.check_call(cmd)
     except subprocess.CalledProcessError as err:
@@ -487,7 +510,7 @@ def os_installer_product_info(catalog, workdir, ignore_cache=False):
                 product_info[product_key]['title'] = dist_info.get('title_from_dist')
             if not product_info[product_key]['version']:
                 product_info[product_key]['version'] = dist_info.get('VERSION')
-        
+
     return product_info
 
 
@@ -640,7 +663,8 @@ def main():
         # install the product to the mounted sparseimage volume
         success = install_product(
             product_info[product_id]['DistributionPath'],
-            mountpoint)
+            mountpoint,
+            check_is_legacy(product_info[product_id]['title']))
         if not success:
             print('Product installation failed.', file=sys.stderr)
             unmountdmg(mountpoint)
