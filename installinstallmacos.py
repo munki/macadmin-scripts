@@ -34,6 +34,7 @@ import plistlib
 import subprocess
 import sys
 import platform
+
 try:
     # python 2
     from urllib.parse import urlsplit
@@ -234,40 +235,44 @@ def unmountdmg(mountpoint):
             print('Failed to unmount %s' % mountpoint, file=sys.stderr)
 
 
-def check_is_legacy(title):
-  if "Sierra" in title or "Mojave" in title or "Catalina" in title:
-    return True
-  return False
+def is_legacy(title):
+    """Returns a boolean to tell us if this is a pre-Big Sur installer"""
+    return "Sierra" in title or "Mojave" in title or "Catalina" in title
 
 
-def install_product(dist_path, target_vol, is_legacy):
+def is_15_6_or_later():
+    """Returns a boolean to indicated whether we're running on macOS 15.6 or later"""
+    os_ver = platform.mac_ver()[0].split('.')
+    ver_major = int(os_ver[0])
+    ver_minor = int(os_ver[1])
+    if ver_major >= 15:
+        if ver_major > 15 or ver_minor >= 6:
+            return True
+    return False
+
+
+def install_product(dist_path, target_vol):
     '''Install a product to a target volume.
     Returns a boolean to indicate success or failure.'''
     # set CM_BUILD env var to make Installer bypass eligibilty checks
     # when installing packages (for machine-specific OS builds)
     os.environ["CM_BUILD"] = "CM_BUILD"
     # check if running on Sequoia 15.6+
-    is_15_6_or_later = False
-    os_ver = platform.mac_ver()[0].split('.')
-    ver_major = int(os_ver[0])
-    ver_minor = int(os_ver[1])
-    if ver_major >= 15:
-      if ver_major > 15 or ver_minor >= 6:
-        is_15_6_or_later = True
-    if is_legacy:
-      if is_15_6_or_later:
-        print('*** Error: building High Sierra, Mojave, and Catalina installer images')
-        print('*** is unsupported on macOS Sequoia 15.6 and later due to breaking changes')
-        print('*** in /usr/sbin/installer by Apple.')
-        return False
-      else:
-        cmd = ['/usr/sbin/installer', '-pkg', dist_path, '-target', target_vol]
+    if is_15_6_or_later():
+        # work around a change in macOS 15.6+ since installing a .dist
+        # file no longer works
+        # find InstallAssistant.pkg and install that instead
+        dist_dir = os.path.dirname(dist_path)
+        install_asst_pkg = os.path.join(dist_dir, "InstallAssistant.pkg")
+        if not os.path.exists(install_asst_pkg):
+          print("*** Error: InstallAssistant.pkg not found.", file=sys.stderr)
+          return False
+        cmd = ['/usr/sbin/installer', '-pkg', install_asst_pkg, '-target', target_vol]
     else:
-      # a hack to work around a change in macOS 15.6+ since installing a .dist
-      # file no longer works
-      dist_dir = os.path.dirname(dist_path)
-      install_asst_pkg = os.path.join(dist_dir, "InstallAssistant.pkg")
-      cmd = ['/usr/sbin/installer', '-pkg', install_asst_pkg, '-target', target_vol]
+        # pre-macOS 15.6 install method
+        # (install the .dist, which acts like installing a distribution pkg)
+        cmd = ['/usr/sbin/installer', '-pkg', dist_path, '-target', target_vol]
+
     try:
         subprocess.check_call(cmd)
     except subprocess.CalledProcessError as err:
@@ -642,6 +647,15 @@ def main():
     except (ValueError, IndexError):
         print('Exiting.')
         exit(0)
+    
+    if is_legacy(product_info[product_id].get('title','')):
+        # Catalina and earlier do not have InstallAssistant.pkg, and
+        # InstallAssistantAuto.pkg (which they do have) do not work for
+        # installing the Install macOS.app
+        print('*** Error: building High Sierra, Mojave, and Catalina installer images', file=sys.stderr)
+        print('*** is unsupported on macOS Sequoia 15.6 and later due to breaking changes', file=sys.stderr)
+        print('*** in /usr/sbin/installer by Apple.', file=sys.stderr)
+        exit(1)
 
     # download all the packages for the selected product
     replicate_product(
@@ -663,8 +677,7 @@ def main():
         # install the product to the mounted sparseimage volume
         success = install_product(
             product_info[product_id]['DistributionPath'],
-            mountpoint,
-            check_is_legacy(product_info[product_id]['title']))
+            mountpoint)
         if not success:
             print('Product installation failed.', file=sys.stderr)
             unmountdmg(mountpoint)
