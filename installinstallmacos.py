@@ -44,6 +44,9 @@ except ImportError:
 from xml.dom import minidom
 from xml.parsers.expat import ExpatError
 
+# disable pylint's suggestions about using f-strings
+# pylint: disable=C0209
+
 try:
     import xattr
 except ImportError:
@@ -104,7 +107,9 @@ def read_plist(filepath):
             return plistlib.load(fileobj)
     except AttributeError:
         # plistlib module doesn't have a load function (as in Python 2)
+        # pylint: disable=E1101
         return plistlib.readPlist(filepath)
+        # pylint: enable=E1101
 
 
 def read_plist_from_string(bytestring):
@@ -113,7 +118,9 @@ def read_plist_from_string(bytestring):
         return plistlib.loads(bytestring)
     except AttributeError:
         # plistlib module doesn't have a load function (as in Python 2)
+        # pylint: disable=E1101
         return plistlib.readPlistFromString(bytestring)
+        # pylint: enable=E1101
 
 
 def get_seeding_program(sucatalog_url):
@@ -164,16 +171,17 @@ def make_sparse_image(volume_name, output_path):
         output = subprocess.check_output(cmd)
     except subprocess.CalledProcessError as err:
         print(err, file=sys.stderr)
-        exit(-1)
+        sys.exit(-1)
     try:
-        return read_plist_from_string(output)[0]
-    except IndexError as err:
+        output = read_plist_from_string(output)[0]
+    except IndexError:
         print('Unexpected output from hdiutil: %s' % output, file=sys.stderr)
-        exit(-1)
+        sys.exit(-1)
     except ExpatError as err:
         print('Malformed output from hdiutil: %s' % output, file=sys.stderr)
         print(err, file=sys.stderr)
-        exit(-1)
+        sys.exit(-1)
+    return output
 
 
 def make_compressed_dmg(app_path, diskimagepath):
@@ -265,8 +273,8 @@ def install_product(dist_path, target_vol):
         dist_dir = os.path.dirname(dist_path)
         install_asst_pkg = os.path.join(dist_dir, "InstallAssistant.pkg")
         if not os.path.exists(install_asst_pkg):
-          print("*** Error: InstallAssistant.pkg not found.", file=sys.stderr)
-          return False
+            print("*** Error: InstallAssistant.pkg not found.", file=sys.stderr)
+            return False
         cmd = ['/usr/sbin/installer', '-pkg', install_asst_pkg, '-target', target_vol]
     else:
         # pre-macOS 15.6 install method
@@ -278,29 +286,30 @@ def install_product(dist_path, target_vol):
     except subprocess.CalledProcessError as err:
         print(err, file=sys.stderr)
         return False
-    else:
-        # Apple postinstall script bug ends up copying files to a path like
-        # /tmp/dmg.T9ak1HApplications
-        path = target_vol + 'Applications'
-        if os.path.exists(path):
-            print('*********************************************************')
-            print('*** Working around a very dumb Apple bug in a package ***')
-            print('*** postinstall script that fails to correctly target ***')
-            print('*** the Install macOS.app when installed to a volume  ***')
-            print('*** other than the current boot volume.               ***')
-            print('***       Please file feedback with Apple!            ***')
-            print('*********************************************************')
-            subprocess.check_call(
-                ['/usr/bin/ditto',
-                 path,
-                 os.path.join(target_vol, 'Applications')]
-            )
-            subprocess.check_call(['/bin/rm', '-r', path])
-        return True
+
+    # Apple postinstall script bug ends up copying files to a path like
+    # /tmp/dmg.T9ak1HApplications
+    path = target_vol + 'Applications'
+    if os.path.exists(path):
+        print('*********************************************************')
+        print('*** Working around a very dumb Apple bug in a package ***')
+        print('*** postinstall script that fails to correctly target ***')
+        print('*** the Install macOS.app when installed to a volume  ***')
+        print('*** other than the current boot volume.               ***')
+        print('***       Please file feedback with Apple!            ***')
+        print('*********************************************************')
+        subprocess.check_call(
+            ['/usr/bin/ditto',
+             path,
+             os.path.join(target_vol, 'Applications')]
+        )
+        subprocess.check_call(['/bin/rm', '-r', path])
+    return True
+
 
 class ReplicationError(Exception):
     '''A custom error when replication fails'''
-    pass
+    #pass
 
 
 def replicate_url(full_url,
@@ -340,7 +349,7 @@ def replicate_url(full_url,
         print("Downloading %s..." % full_url)
         need_download = False
         try:
-            output = subprocess.check_output(curl_cmd)
+            _ = subprocess.check_output(curl_cmd)
         except subprocess.CalledProcessError as err:
             if not resumed or not err.output.isdigit():
                 raise ReplicationError(err)
@@ -446,7 +455,7 @@ def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
             sucatalog, root_dir=workdir, ignore_cache=ignore_cache)
     except ReplicationError as err:
         print('Could not replicate %s: %s' % (sucatalog, err), file=sys.stderr)
-        exit(-1)
+        sys.exit(-1)
     if os.path.splitext(localcatalogpath)[1] == '.gz':
         with gzip.open(localcatalogpath) as the_file:
             content = the_file.read()
@@ -456,7 +465,7 @@ def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
             except ExpatError as err:
                 print('Error reading %s: %s' % (localcatalogpath, err),
                       file=sys.stderr)
-                exit(-1)
+                sys.exit(-1)
     else:
         try:
             catalog = read_plist(localcatalogpath)
@@ -464,7 +473,7 @@ def download_and_parse_sucatalog(sucatalog, workdir, ignore_cache=False):
         except (OSError, IOError, ExpatError) as err:
             print('Error reading %s: %s' % (localcatalogpath, err),
                   file=sys.stderr)
-            exit(-1)
+            sys.exit(-1)
 
 
 def find_mac_os_installers(catalog):
@@ -529,13 +538,16 @@ def replicate_product(catalog, product_id, workdir, ignore_cache=False):
         if 'URL' in package:
             try:
                 replicate_url(
-                    package['URL'], root_dir=workdir,
-                    show_progress=True, ignore_cache=ignore_cache,
-                    attempt_resume=(not ignore_cache))
+                    package['URL'],
+                    root_dir=workdir,
+                    show_progress=True,
+                    ignore_cache=ignore_cache,
+                    attempt_resume=not ignore_cache
+                )
             except ReplicationError as err:
                 print('Could not replicate %s: %s' % (package['URL'], err),
                       file=sys.stderr)
-                exit(-1)
+                sys.exit(-1)
         if 'MetadataURL' in package:
             try:
                 replicate_url(package['MetadataURL'], root_dir=workdir,
@@ -543,7 +555,7 @@ def replicate_product(catalog, product_id, workdir, ignore_cache=False):
             except ReplicationError as err:
                 print('Could not replicate %s: %s'
                       % (package['MetadataURL'], err), file=sys.stderr)
-                exit(-1)
+                sys.exit(-1)
 
 
 def find_installer_app(mountpoint):
@@ -605,13 +617,13 @@ def main():
                   % args.seedprogram, file=sys.stderr)
             print('Valid seeding programs are: %s'
                   % ', '.join(get_seeding_programs()), file=sys.stderr)
-            exit(-1)
+            sys.exit(-1)
     else:
         su_catalog_url = get_default_catalog()
         if not su_catalog_url:
             print('Could not find a default catalog url for this OS version.',
                   file=sys.stderr)
-            exit(-1)
+            sys.exit(-1)
 
     # download sucatalog and look for products that are for macOS installers
     catalog = download_and_parse_sucatalog(
@@ -622,7 +634,7 @@ def main():
     if not product_info:
         print('No macOS installer products found in the sucatalog.',
               file=sys.stderr)
-        exit(-1)
+        sys.exit(-1)
 
     # display a menu of choices (some seed catalogs have multiple installers)
     print('%2s %14s %10s %8s %11s  %s'
@@ -646,16 +658,18 @@ def main():
         product_id = list(product_info.keys())[index]
     except (ValueError, IndexError):
         print('Exiting.')
-        exit(0)
-    
+        sys.exit(0)
+
     if is_legacy(product_info[product_id].get('title','')):
         # Catalina and earlier do not have InstallAssistant.pkg, and
         # InstallAssistantAuto.pkg (which they do have) do not work for
         # installing the Install macOS.app
-        print('*** Error: building High Sierra, Mojave, and Catalina installer images', file=sys.stderr)
-        print('*** is unsupported on macOS Sequoia 15.6 and later due to breaking changes', file=sys.stderr)
-        print('*** in /usr/sbin/installer by Apple.', file=sys.stderr)
-        exit(1)
+        print(
+            '*** Error: building High Sierra, Mojave, and Catalina installer images\n'
+            '*** is unsupported on macOS Sequoia 15.6 and later due to breaking changes\n'
+            '*** in /usr/sbin/installer by Apple.', file=sys.stderr
+        )
+        sys.exit(1)
 
     # download all the packages for the selected product
     replicate_product(
@@ -681,7 +695,7 @@ def main():
         if not success:
             print('Product installation failed.', file=sys.stderr)
             unmountdmg(mountpoint)
-            exit(-1)
+            sys.exit(-1)
         # add the seeding program xattr to the app if applicable
         seeding_program = get_seeding_program(su_catalog_url)
         if seeding_program:
