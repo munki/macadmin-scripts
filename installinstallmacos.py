@@ -248,15 +248,28 @@ def is_legacy(title):
     return "Sierra" in title or "Mojave" in title or "Catalina" in title
 
 
-def is_15_6_or_later():
-    """Returns a boolean to indicated whether we're running on macOS 15.6 or later"""
-    os_ver = platform.mac_ver()[0].split('.')
-    ver_major = int(os_ver[0])
-    ver_minor = int(os_ver[1])
-    if ver_major >= 15:
-        if ver_major > 15 or ver_minor >= 6:
-            return True
-    return False
+def macOsVersion(only_major_minor=True):
+    """Returns a macOS version as a tuple of integers
+
+    Args:
+      only_major_minor: Boolean. If True, only include major/minor versions.
+    """
+    # platform.mac_ver() returns 10.16-style version info on Big Sur
+    # and is likely to do so until Python is compiled with the macOS 11 SDK
+    # which may not happen for a while. And Apple's odd tricks mean that even
+    # reading /System/Library/CoreServices/SystemVersion.plist is unreliable.
+    # So let's use a different method.
+    try:
+        os_version_tuple = subprocess.check_output(
+            ('/usr/bin/sw_vers', '-productVersion'),
+            env={'SYSTEM_VERSION_COMPAT': '0'}
+        ).decode('UTF-8').rstrip().split('.')
+    except subprocess.CalledProcessError:
+        # fall back to platform.mac_ver()
+        os_version_tuple = platform.mac_ver()[0].split(".")
+    if only_major_minor:
+        os_version_tuple = os_version_tuple[0:2]
+    return tuple(map(int, os_version_tuple))
 
 
 def install_product(dist_path, target_vol):
@@ -266,7 +279,7 @@ def install_product(dist_path, target_vol):
     # when installing packages (for machine-specific OS builds)
     os.environ["CM_BUILD"] = "CM_BUILD"
     # check if running on Sequoia 15.6+
-    if is_15_6_or_later():
+    if macOsVersion() >= (15,6):
         # work around a change in macOS 15.6+ since installing a .dist
         # file no longer works
         # find InstallAssistant.pkg and install that instead
